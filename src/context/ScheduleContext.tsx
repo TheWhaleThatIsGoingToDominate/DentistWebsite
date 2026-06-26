@@ -23,16 +23,16 @@ const today = new Date().toISOString().slice(0, 10)
 
 const defaultSchedule: ScheduleByDate = {
   [today]: [
-    { time: '09:00', status: 'available' },
-    { time: '09:30', status: 'available' },
-    { time: '10:00', status: 'blocked' },
-    { time: '10:30', status: 'available' },
-    { time: '11:00', status: 'booked' },
-    { time: '11:30', status: 'available' },
-    { time: '12:00', status: 'available' },
-    { time: '12:30', status: 'blocked' },
-    { time: '13:00', status: 'available' },
-    { time: '13:30', status: 'available' },
+    { time: '09:00 AM', status: 'available' },
+    { time: '09:30 AM', status: 'available' },
+    { time: '10:00 AM', status: 'blocked' },
+    { time: '10:30 AM', status: 'available' },
+    { time: '11:00 AM', status: 'booked' },
+    { time: '11:30 AM', status: 'available' },
+    { time: '12:00 PM', status: 'available' },
+    { time: '12:30 PM', status: 'blocked' },
+    { time: '01:00 PM', status: 'available' },
+    { time: '01:30 PM', status: 'available' },
   ],
 }
 

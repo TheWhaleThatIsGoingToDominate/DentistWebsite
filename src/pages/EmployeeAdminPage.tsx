@@ -6,14 +6,48 @@ import { checkEmployeeAccessKey } from '../utils/employeeAccess'
 const today = new Date().toISOString().slice(0, 10)
 
 function timeToMinutes(time: string) {
+  const twelveHourMatch = time.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i)
+  if (twelveHourMatch) {
+    const [, rawHours, rawMinutes, period] = twelveHourMatch
+    const hours = Number(rawHours)
+    const minutes = Number(rawMinutes)
+    const normalizedHours = (hours % 12) + (period.toUpperCase() === 'PM' ? 12 : 0)
+    return normalizedHours * 60 + minutes
+  }
+
   const [hours, minutes] = time.split(':').map(Number)
   return hours * 60 + minutes
 }
     
 function minutesToTime(totalMinutes: number) {
-  const hours = Math.floor(totalMinutes / 60).toString().padStart(2, '0')
+  const hours24 = Math.floor(totalMinutes / 60)
   const minutes = (totalMinutes % 60).toString().padStart(2, '0')
-  return `${hours}:${minutes}`
+  const period = hours24 >= 12 ? 'PM' : 'AM'
+  const hours12 = hours24 % 12 || 12
+  return `${hours12.toString().padStart(2, '0')}:${minutes} ${period}`
+}
+
+const timeOptions = Array.from({ length: 48 }, (_, index) => minutesToTime(index * 30))
+
+function TimeSelect({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="form-label">
+      {label}
+      <select className="form-input" value={value} onChange={(event) => onChange(event.target.value)}>
+        {timeOptions.map((time) => (
+          <option key={time} value={time}>{time}</option>
+        ))}
+      </select>
+    </label>
+  )
 }
 
 function generateSlots(startTime: string, endTime: string, slotLength: number): AppointmentSlot[] {
@@ -37,8 +71,8 @@ export default function EmployeeAdminPage() {
   const [accessKey, setAccessKey] = useState('')
   const [accessError, setAccessError] = useState('')
   const [selectedDate, setSelectedDate] = useState(today)
-  const [startTime, setStartTime] = useState('09:00')
-  const [endTime, setEndTime] = useState('17:00')
+  const [startTime, setStartTime] = useState('09:00 AM')
+  const [endTime, setEndTime] = useState('05:00 PM')
   const [slotLength, setSlotLength] = useState(30)
   const [saveMessage, setSaveMessage] = useState('')
 
@@ -120,14 +154,8 @@ export default function EmployeeAdminPage() {
               Date
               <input className="form-input" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
             </label>
-            <label className="form-label">
-              Working start time
-              <input className="form-input" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
-            </label>
-            <label className="form-label">
-              Working end time
-              <input className="form-input" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
-            </label>
+            <TimeSelect label="Working start time" value={startTime} onChange={setStartTime} />
+            <TimeSelect label="Working end time" value={endTime} onChange={setEndTime} />
             <label className="form-label">
               Slot length
               <select className="form-input" value={slotLength} onChange={(event) => setSlotLength(Number(event.target.value))}>
