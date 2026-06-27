@@ -14,6 +14,7 @@ type ScheduleContextValue = {
   schedule: ScheduleByDate
   getSlotsForDate: (date: string) => AppointmentSlot[]
   setSlotsForDate: (date: string, slots: AppointmentSlot[]) => void
+  updateSlotForDate: (date: string, updatedSlot: AppointmentSlot) => void
   updateSlotStatus: (date: string, time: string, status: SlotStatus) => void
 }
 
@@ -65,6 +66,15 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       setSchedule((current) => ({ ...current, [date]: slots }))
     }
 
+    const updateSlotForDate = (date: string, updatedSlot: AppointmentSlot) => {
+      setSchedule((current) => ({
+        ...current,
+        [date]: (current[date] ?? []).map((slot) =>
+          slot.time === updatedSlot.time ? updatedSlot : slot,
+        ),
+      }))
+    }
+
     const updateSlotStatus = (date: string, time: string, status: SlotStatus) => {
       setSchedule((current) => ({
         ...current,
@@ -74,7 +84,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       }))
     }
 
-    return { schedule, getSlotsForDate, setSlotsForDate, updateSlotStatus }
+    return { schedule, getSlotsForDate, setSlotsForDate, updateSlotForDate, updateSlotStatus }
   }, [schedule])
 
   return <ScheduleContext.Provider value={value}>{children}</ScheduleContext.Provider>

@@ -1,10 +1,9 @@
 import type { AppointmentSlot } from '../context/ScheduleContext'
 
 // Set this to your backend origin if it is different from the frontend origin.
-const SCHEDULE_API_BASE_URL = ''
+const SCHEDULE_API_BASE_URL = 'https://clinic-auth.vercel.app'
 
 export type GenerateSlotsRequest = {
-  date: string
   // Expected format: "09:30 AM" or "05:00 PM".
   start_time: string
   // Expected format: "09:30 AM" or "05:00 PM".
@@ -26,6 +25,13 @@ export type SaveSlotsResponse = {
   message?: string
 }
 
+export type UpdateSlotStatusRequest = {
+  date: string
+  slot: AppointmentSlot
+}
+
+export type UpdateSlotStatusResponse = AppointmentSlot
+
 async function readJsonResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     throw new Error(`Schedule API request failed with status ${response.status}`)
@@ -37,7 +43,7 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
 export async function generateSlotsFromBackend(
   requestData: GenerateSlotsRequest,
 ): Promise<GenerateSlotsResponse> {
-  const response = await fetch(`${SCHEDULE_API_BASE_URL}/api/schedule/generate-slots`, {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/generate`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -51,7 +57,7 @@ export async function generateSlotsFromBackend(
 export async function saveSlotsToBackend(
   requestData: SaveSlotsRequest,
 ): Promise<SaveSlotsResponse> {
-  const response = await fetch(`${SCHEDULE_API_BASE_URL}/api/schedule/save-slots`, {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/saveSlots`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -60,4 +66,18 @@ export async function saveSlotsToBackend(
   })
 
   return readJsonResponse<SaveSlotsResponse>(response)
+}
+
+export async function updateSlotStatusInBackend(
+  requestData: UpdateSlotStatusRequest,
+): Promise<UpdateSlotStatusResponse> {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/changeState`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestData),
+  })
+
+  return readJsonResponse<UpdateSlotStatusResponse>(response)
 }

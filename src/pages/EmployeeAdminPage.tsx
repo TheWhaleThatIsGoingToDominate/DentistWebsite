@@ -1,7 +1,8 @@
 import { FormEvent, useState } from 'react'
 import { LockKeyhole, Save } from 'lucide-react'
-import { AppointmentSlot, SlotStatus, useSchedule } from '../context/ScheduleContext'
+import { AppointmentSlot, useSchedule } from '../context/ScheduleContext'
 import { checkEmployeeAccessKey } from '../utils/employeeAccess'
+import { generateSlotsFromBackend, updateSlotStatusInBackend } from '../utils/scheduleApi'
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -66,7 +67,7 @@ function generateSlots(startTime: string, endTime: string, slotLength: number): 
 }
 
 export default function EmployeeAdminPage() {
-  const { getSlotsForDate, setSlotsForDate, updateSlotStatus } = useSchedule()
+  const { getSlotsForDate, setSlotsForDate, updateSlotForDate, updateSlotStatus } = useSchedule()
   const [hasAccess, setHasAccess] = useState(false)
   const [accessKey, setAccessKey] = useState('')
   const [accessError, setAccessError] = useState('')
@@ -75,6 +76,8 @@ export default function EmployeeAdminPage() {
   const [endTime, setEndTime] = useState('05:00 PM')
   const [slotLength, setSlotLength] = useState(30)
   const [saveMessage, setSaveMessage] = useState('')
+  const [isGeneratingSlots, setIsGeneratingSlots] = useState(false)
+  const [updatingSlotTime, setUpdatingSlotTime] = useState('')
 
   const slots = getSlotsForDate(selectedDate)
 
@@ -94,14 +97,47 @@ export default function EmployeeAdminPage() {
     setHasAccess(true)
   }
 
-  const handleGenerateSlots = () => {
-    setSlotsForDate(selectedDate, generateSlots(startTime, endTime, slotLength))
+  const handleGenerateSlots = async () => {
     setSaveMessage('')
+    setIsGeneratingSlots(true)
+
+    try {
+      const data = await generateSlotsFromBackend({
+        start_time: startTime,
+        end_time: endTime,
+        slot_length_minutes: slotLength,
+      })
+
+      setSlotsForDate(selectedDate, data.slots)
+    } catch {
+      setSlotsForDate(selectedDate, generateSlots(startTime, endTime, slotLength))
+      setSaveMessage('Backend is not connected yet. Generated slots locally for demo.')
+    } finally {
+      setIsGeneratingSlots(false)
+    }
   }
 
-  const toggleSlot = (time: string, status: SlotStatus) => {
-    updateSlotStatus(selectedDate, time, status === 'available' ? 'blocked' : 'available')
+  const toggleSlot = async (slot: AppointmentSlot) => {
     setSaveMessage('')
+    setUpdatingSlotTime(slot.time)
+
+    try {
+      const updatedSlot = await updateSlotStatusInBackend({
+        date: selectedDate,
+        slot,
+      })
+
+      updateSlotForDate(selectedDate, updatedSlot)
+    } catch {
+      updateSlotStatus(
+        selectedDate,
+        slot.time,
+        slot.status === 'available' ? 'blocked' : 'available',
+      )
+      setSaveMessage('Backend is not connected yet. Changed slot status locally for demo.')
+    } finally {
+      setUpdatingSlotTime('')
+    }
   }
 
   if (!hasAccess) {
@@ -168,8 +204,8 @@ export default function EmployeeAdminPage() {
           </div>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <button type="button" onClick={handleGenerateSlots} className="min-h-12 rounded-full bg-ink px-6 text-sm font-bold text-white transition hover:bg-teal-700">
-              Generate Slots
+            <button type="button" onClick={handleGenerateSlots} disabled={isGeneratingSlots} className="min-h-12 rounded-full bg-ink px-6 text-sm font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50">
+              {isGeneratingSlots ? 'Generating...' : 'Generate Slots'}
             </button>
             <button
               type="button"
@@ -196,7 +232,8 @@ export default function EmployeeAdminPage() {
                 <button
                   key={slot.time}
                   type="button"
-                  onClick={() => toggleSlot(slot.time, slot.status)}
+                  onClick={() => toggleSlot(slot)}
+                  disabled={updatingSlotTime === slot.time}
                   className={`flex min-h-14 items-center justify-between rounded-xl border px-4 text-left text-sm font-bold transition ${
                     slot.status === 'available'
                       ? 'border-teal-200 bg-teal-50 text-teal-800 hover:border-teal-500'
@@ -206,7 +243,7 @@ export default function EmployeeAdminPage() {
                   }`}
                 >
                   <span>{slot.time}</span>
-                  <span className="capitalize">{slot.status}</span>
+                  <span className="capitalize">{updatingSlotTime === slot.time ? 'updating...' : slot.status}</span>
                 </button>
               ))
             ) : (
