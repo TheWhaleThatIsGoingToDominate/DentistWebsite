@@ -5,10 +5,10 @@ const SCHEDULE_API_BASE_URL = 'https://clinic-auth.vercel.app'
 
 export type GenerateSlotsRequest = {
   // Expected format: "09:30 AM" or "05:00 PM".
-  start_time: string
+  startTime: string
   // Expected format: "09:30 AM" or "05:00 PM".
-  end_time: string
-  slot_length_minutes: number
+  endTime: string
+  slotLength: number
 }
 
 export type GenerateSlotsResponse = {
@@ -23,11 +23,6 @@ export type SaveSlotsRequest = {
 export type SaveSlotsResponse = {
   success: boolean
   message?: string
-}
-
-export type UpdateSlotStatusRequest = {
-  date: string
-  slot: AppointmentSlot
 }
 
 export type UpdateSlotStatusResponse = AppointmentSlot
@@ -51,7 +46,8 @@ export async function generateSlotsFromBackend(
     body: JSON.stringify(requestData),
   })
 
-  return readJsonResponse<GenerateSlotsResponse>(response)
+  const slots = await readJsonResponse<AppointmentSlot[]>(response)
+  return { slots }
 }
 
 export async function saveSlotsToBackend(
@@ -69,14 +65,14 @@ export async function saveSlotsToBackend(
 }
 
 export async function updateSlotStatusInBackend(
-  requestData: UpdateSlotStatusRequest,
+  slot: AppointmentSlot,
 ): Promise<UpdateSlotStatusResponse> {
   const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/changeState`, {
-    method: 'POST',
+    method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(requestData),
+    body: JSON.stringify(slot),
   })
 
   return readJsonResponse<UpdateSlotStatusResponse>(response)

@@ -103,9 +103,9 @@ export default function EmployeeAdminPage() {
 
     try {
       const data = await generateSlotsFromBackend({
-        start_time: startTime,
-        end_time: endTime,
-        slot_length_minutes: slotLength,
+        startTime,
+        endTime,
+        slotLength,
       })
 
       setSlotsForDate(selectedDate, data.slots)
@@ -122,10 +122,7 @@ export default function EmployeeAdminPage() {
     setUpdatingSlotTime(slot.time)
 
     try {
-      const updatedSlot = await updateSlotStatusInBackend({
-        date: selectedDate,
-        slot,
-      })
+      const updatedSlot = await updateSlotStatusInBackend(slot)
 
       updateSlotForDate(selectedDate, updatedSlot)
     } catch {
