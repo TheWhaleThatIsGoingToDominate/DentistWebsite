@@ -2,34 +2,36 @@
 from database.main import supabase
 
 def save_slots(date: str, slots: list):
-    for key in slots:
-        existing = (supabase.table("savingTheSlots")
-        .select("*")
-        .eq("date", date)
-        .eq("time", key["time"])
-        .execute()
-        .data
+    for slot in slots:
+        existing = (
+            supabase.table("savingTheSlots")
+            .select("*")
+            .eq("date", date)
+            .eq("time", slot["time"])
+            .execute()
+            .data
         )
+
         if existing:
             (
                 supabase.table("savingTheSlots")
-                .update({"time":key["time"]})
+                .update({"status": slot["status"]})
                 .eq("date", date)
-                .eq("time", key["time"])
+                .eq("time", slot["time"])
                 .execute()
             )
         else:
             (
                 supabase.table("savingTheSlots")
                 .insert({
-                "time":key["time"],
-                "status":key["status"],
-                "date":date
-            })
+                    "date": date,
+                    "time": slot["time"],
+                    "status": slot["status"]
+                })
                 .execute()
             )
-    
-    return {"saved":True, "count":len(slots)}
+
+    return {"saved": True, "count": len(slots)}
 
 
 
