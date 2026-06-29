@@ -38,6 +38,7 @@ class changeStatus(BaseModel):
 
 class SaveTheSlots(BaseModel):
     slots: list
+    date: str
 
 @app.post("/employee/auth")
 def auth(verification: Verification):
@@ -83,8 +84,8 @@ def changeState(Slot: changeStatus):
 
 
 @app.post("/employee/saveSlots")
-def saveSlots(slots: SaveTheSlots):
-    return save_slots(slots.slots)
+def saveSlots(data: SaveTheSlots):
+    return save_slots(data.date, data.slots)
 
 
 # yo, important thing here, if you want to make the thing run again,
