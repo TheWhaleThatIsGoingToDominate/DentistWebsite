@@ -1,7 +1,7 @@
 #TODO: make a backend that saves the slots generated from generateSlots.py to a database
 from database.main import supabase
 
-def save_slots(date: str, slots: list):
+def save_slots(date: str, slots: list): #<copied
     for slot in slots:
         existing = (
             supabase.table("savingTheSlots")
