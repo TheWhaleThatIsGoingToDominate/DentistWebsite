@@ -4,7 +4,8 @@ from database.main import supabase
 def save_slots(date: str, slots: list):
     for key in slots:
         existing = (supabase.table("savingTheSlots")
-        .select(key)
+        .select("*")
+        .eq("time", key["time"])
         .execute()
         )
         if existing:
@@ -20,17 +21,22 @@ def save_slots(date: str, slots: list):
                 .execute()
             )
         else:
+            new_slot = {
+                "time":key["time"],
+                "status":key["status"],
+                "date":date
+            }
             (
-                supabase.table("saveTheSlots")
-                .insert(key.update({"date":date}))
+                supabase.table("savingTheSlots")
+                .insert(new_slot)
                 .execute()
             )
     
-    return True
+    return {"saved":True, "count":len(slots)}
 
 
 
-
+#.update method in dicts returns None
 # the only error I am concerned of (it also applies in other files):
 # from database.main import data
 # #    ^^^^^^^^ SyntaxError: no module named "database"
