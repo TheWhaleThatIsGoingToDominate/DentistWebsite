@@ -16,10 +16,15 @@ export type GenerateSlotsResponse = {
 }
 
 export type SaveSlotsRequest = {
+  date: string
   slots: AppointmentSlot[]
 }
 
 export type SaveSlotsResponse = boolean
+
+export type UpdateSlotStatusRequest = {
+  slot: AppointmentSlot
+}
 
 export type UpdateSlotStatusResponse = AppointmentSlot
 
@@ -61,14 +66,14 @@ export async function saveSlotsToBackend(
 }
 
 export async function updateSlotStatusInBackend(
-  slot: AppointmentSlot,
+  requestData: UpdateSlotStatusRequest,
 ): Promise<UpdateSlotStatusResponse> {
   const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/changeState`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(slot),
+    body: JSON.stringify(requestData),
   })
 
   return readJsonResponse<UpdateSlotStatusResponse>(response)

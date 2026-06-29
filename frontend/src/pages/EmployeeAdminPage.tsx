@@ -123,7 +123,9 @@ export default function EmployeeAdminPage() {
     setUpdatingSlotTime(slot.time)
 
     try {
-      const updatedSlot = await updateSlotStatusInBackend(slot)
+      const updatedSlot = await updateSlotStatusInBackend({
+        slot,
+      })
 
       updateSlotForDate(selectedDate, updatedSlot)
     } catch {
@@ -143,7 +145,10 @@ export default function EmployeeAdminPage() {
     setIsSavingSlots(true)
 
     try {
-      const saved = await saveSlotsToBackend({ slots })
+      const saved = await saveSlotsToBackend({
+        date: selectedDate,
+        slots,
+      })
       setSaveMessage(saved ? 'Schedule saved to backend.' : 'Schedule was not saved.')
     } catch {
       setSaveMessage('Could not save schedule to backend.')
