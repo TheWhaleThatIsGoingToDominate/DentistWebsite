@@ -16,14 +16,10 @@ export type GenerateSlotsResponse = {
 }
 
 export type SaveSlotsRequest = {
-  date: string
   slots: AppointmentSlot[]
 }
 
-export type SaveSlotsResponse = {
-  success: boolean
-  message?: string
-}
+export type SaveSlotsResponse = boolean
 
 export type UpdateSlotStatusResponse = AppointmentSlot
 

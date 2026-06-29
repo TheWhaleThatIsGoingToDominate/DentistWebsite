@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react'
 import { LockKeyhole, Save } from 'lucide-react'
 import { AppointmentSlot, useSchedule } from '../context/ScheduleContext'
 import { checkEmployeeAccessKey } from '../utils/employeeAccess'
-import { generateSlotsFromBackend, updateSlotStatusInBackend } from '../utils/scheduleApi'
+import { generateSlotsFromBackend, saveSlotsToBackend, updateSlotStatusInBackend } from '../utils/scheduleApi'
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -77,6 +77,7 @@ export default function EmployeeAdminPage() {
   const [slotLength, setSlotLength] = useState(30)
   const [saveMessage, setSaveMessage] = useState('')
   const [isGeneratingSlots, setIsGeneratingSlots] = useState(false)
+  const [isSavingSlots, setIsSavingSlots] = useState(false)
   const [updatingSlotTime, setUpdatingSlotTime] = useState('')
 
   const slots = getSlotsForDate(selectedDate)
@@ -134,6 +135,20 @@ export default function EmployeeAdminPage() {
       setSaveMessage('Backend is not connected yet. Changed slot status locally for demo.')
     } finally {
       setUpdatingSlotTime('')
+    }
+  }
+
+  const handleSaveSlots = async () => {
+    setSaveMessage('')
+    setIsSavingSlots(true)
+
+    try {
+      const saved = await saveSlotsToBackend({ slots })
+      setSaveMessage(saved ? 'Schedule saved to backend.' : 'Schedule was not saved.')
+    } catch {
+      setSaveMessage('Could not save schedule to backend.')
+    } finally {
+      setIsSavingSlots(false)
     }
   }
 
@@ -206,11 +221,12 @@ export default function EmployeeAdminPage() {
             </button>
             <button
               type="button"
-              onClick={() => setSaveMessage('Schedule saved locally for demo.')}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-teal-200 bg-white px-6 text-sm font-bold text-ink transition hover:border-teal-400 hover:bg-teal-50"
+              onClick={handleSaveSlots}
+              disabled={isSavingSlots}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-teal-200 bg-white px-6 text-sm font-bold text-ink transition hover:border-teal-400 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              Save
+              {isSavingSlots ? 'Saving...' : 'Save'}
             </button>
           </div>
 
