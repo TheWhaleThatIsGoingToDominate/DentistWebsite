@@ -17,8 +17,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://dentist-website-lac-two.vercel.app",
-        "https://dentist-website-lac-two.vercel.app/employee-admin"
+        "https://dentist-website-lac-two.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
