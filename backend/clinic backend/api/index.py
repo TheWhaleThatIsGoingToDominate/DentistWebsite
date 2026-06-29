@@ -85,7 +85,13 @@ def changeState(Slot: changeStatus):
 
 @app.post("/employee/saveSlots")
 def saveSlots(data: SaveTheSlots):
-    return save_slots(data.date, data.slots)
+    try:
+        return save_slots(data.date, data.slots)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 
 # yo, important thing here, if you want to make the thing run again,
