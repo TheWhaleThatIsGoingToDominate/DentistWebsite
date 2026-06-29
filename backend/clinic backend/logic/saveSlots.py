@@ -25,6 +25,8 @@ def save_slots(date: str, slots: list):
                 .insert(key.update({"date":date}))
                 .execute()
             )
+    
+    return True
 
 
 
