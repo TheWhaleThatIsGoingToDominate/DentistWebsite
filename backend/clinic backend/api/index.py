@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, status
 from logic.authentication import Authentication
 from logic.generateSlots import generate_slots
 from logic.changeStatusOfSlot import change_status
-from database.main import save_slots #< the function that handles saving
+from logic.saveSlots import save_slots #< the function that handles saving
 #    ^^^^ new importing method, you can use {name of folder}.name of file to import a certain file
 # that is outside of the folder, but is inside the parent folder
 from pydantic import BaseModel
