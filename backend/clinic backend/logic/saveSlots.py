@@ -5,30 +5,27 @@ def save_slots(date: str, slots: list):
     for key in slots:
         existing = (supabase.table("savingTheSlots")
         .select("*")
+        .eq("date", date)
         .eq("time", key["time"])
         .execute()
+        .data
         )
         if existing:
             (
                 supabase.table("savingTheSlots")
-                .update({
-                    "time":key["time"],
-                    "status":key["status"],
-                    "date":date
-
-                })
+                .update({"time":key["time"]})
+                .eq("date", date)
                 .eq("time", key["time"])
                 .execute()
             )
         else:
-            new_slot = {
+            (
+                supabase.table("savingTheSlots")
+                .insert({
                 "time":key["time"],
                 "status":key["status"],
                 "date":date
-            }
-            (
-                supabase.table("savingTheSlots")
-                .insert(new_slot)
+            })
                 .execute()
             )
     
