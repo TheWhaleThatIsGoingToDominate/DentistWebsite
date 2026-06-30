@@ -1,10 +1,20 @@
-import { FormEvent, useState } from 'react'
-import { LockKeyhole, Save } from 'lucide-react'
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { LockKeyhole, RefreshCw, Save } from 'lucide-react'
 import { AppointmentSlot, useSchedule } from '../context/ScheduleContext'
 import { checkEmployeeAccessKey } from '../utils/employeeAccess'
-import { generateSlotsFromBackend, saveSlotsToBackend, updateSlotStatusInBackend } from '../utils/scheduleApi'
+import {
+  BookingRecord,
+  fetchBookingsFromBackend,
+  generateSlotsFromBackend,
+  loadSlotsFromBackend,
+  saveSlotsToBackend,
+  updateSlotStatusInBackend,
+} from '../utils/scheduleApi'
+import { treatments } from '../data/clinic'
 
 const today = new Date().toISOString().slice(0, 10)
+
+type AdminSection = 'slots' | 'bookings'
 
 function timeToMinutes(time: string) {
   const twelveHourMatch = time.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i)
@@ -78,9 +88,88 @@ export default function EmployeeAdminPage() {
   const [saveMessage, setSaveMessage] = useState('')
   const [isGeneratingSlots, setIsGeneratingSlots] = useState(false)
   const [isSavingSlots, setIsSavingSlots] = useState(false)
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false)
   const [updatingSlotTime, setUpdatingSlotTime] = useState('')
+  const [activeSection, setActiveSection] = useState<AdminSection>('slots')
+  const [bookings, setBookings] = useState<BookingRecord[]>([])
+  const [isLoadingBookings, setIsLoadingBookings] = useState(false)
+  const [bookingsError, setBookingsError] = useState('')
+  const [bookingSearch, setBookingSearch] = useState('')
+  const [bookingServiceFilter, setBookingServiceFilter] = useState('')
+  const [bookingDateFilter, setBookingDateFilter] = useState('')
 
   const slots = getSlotsForDate(selectedDate)
+
+  const filteredBookings = useMemo(() => {
+    const normalizedSearch = bookingSearch.trim().toLowerCase()
+
+    return bookings.filter((booking) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        booking.name.toLowerCase().includes(normalizedSearch) ||
+        booking.phone_num.toLowerCase().includes(normalizedSearch)
+      const matchesService = !bookingServiceFilter || booking.service === bookingServiceFilter
+      const matchesDate = !bookingDateFilter || booking.date === bookingDateFilter
+
+      return matchesSearch && matchesService && matchesDate
+    })
+  }, [bookingDateFilter, bookingSearch, bookingServiceFilter, bookings])
+
+  const loadBookings = useCallback(async () => {
+    setBookingsError('')
+    setIsLoadingBookings(true)
+
+    try {
+      const loadedBookings = await fetchBookingsFromBackend()
+      setBookings(loadedBookings)
+    } catch {
+      setBookings([])
+      setBookingsError('Could not load bookings from backend.')
+    } finally {
+      setIsLoadingBookings(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!hasAccess) {
+      return
+    }
+
+    let ignoreResponse = false
+
+    const loadSlotsForSelectedDate = async () => {
+      setSaveMessage('')
+      setIsLoadingSlots(true)
+
+      try {
+        const loadedSlots = await loadSlotsFromBackend(selectedDate)
+        if (!ignoreResponse) {
+          setSlotsForDate(selectedDate, loadedSlots)
+        }
+      } catch {
+        if (!ignoreResponse) {
+          setSlotsForDate(selectedDate, [])
+          setSaveMessage('Could not load slots for this date from backend.')
+        }
+      } finally {
+        if (!ignoreResponse) {
+          setIsLoadingSlots(false)
+        }
+      }
+    }
+
+    loadSlotsForSelectedDate()
+
+    return () => {
+      ignoreResponse = true
+    }
+  }, [hasAccess, selectedDate, setSlotsForDate])
+
+  useEffect(() => {
+    if (hasAccess && activeSection === 'bookings') {
+      loadBookings()
+    }
+  }, [activeSection, hasAccess, loadBookings])
 
   const handleAccessSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -123,9 +212,7 @@ export default function EmployeeAdminPage() {
     setUpdatingSlotTime(slot.time)
 
     try {
-      const updatedSlot = await updateSlotStatusInBackend({
-        slot,
-      })
+      const updatedSlot = await updateSlotStatusInBackend(slot)
 
       updateSlotForDate(selectedDate, updatedSlot)
     } catch {
@@ -149,7 +236,7 @@ export default function EmployeeAdminPage() {
         date: selectedDate,
         slots,
       })
-      setSaveMessage(saved ? 'Schedule saved to backend.' : 'Schedule was not saved.')
+      setSaveMessage(saved.saved ? `Schedule saved to backend. ${saved.count} slots saved.` : 'Schedule was not saved.')
     } catch {
       setSaveMessage('Could not save schedule to backend.')
     } finally {
@@ -201,6 +288,33 @@ export default function EmployeeAdminPage() {
           <h1 className="font-display text-4xl text-ink sm:text-5xl">Employee admin</h1>
         </div>
 
+        <div className="mt-7 grid gap-3 rounded-[1.5rem] bg-white p-2 shadow-card sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setActiveSection('slots')}
+            className={`min-h-12 rounded-[1.1rem] px-5 text-sm font-bold transition ${
+              activeSection === 'slots'
+                ? 'bg-ink text-white shadow-lg shadow-teal-900/10'
+                : 'bg-white text-ink hover:bg-teal-50'
+            }`}
+          >
+            Manage Available Slots
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection('bookings')}
+            className={`min-h-12 rounded-[1.1rem] px-5 text-sm font-bold transition ${
+              activeSection === 'bookings'
+                ? 'bg-ink text-white shadow-lg shadow-teal-900/10'
+                : 'bg-white text-ink hover:bg-teal-50'
+            }`}
+          >
+            Manage Bookings
+          </button>
+        </div>
+
+        {activeSection === 'slots' && (
+          <>
         <div className="mt-7 rounded-[1.5rem] bg-white p-6 shadow-soft">
           <div className="grid gap-5 md:grid-cols-4">
             <label className="form-label">
@@ -245,7 +359,11 @@ export default function EmployeeAdminPage() {
         <div className="mt-7 rounded-[1.5rem] bg-white p-6 shadow-card">
           <h2 className="font-display text-3xl text-ink">Generated slots</h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {slots.length > 0 ? (
+            {isLoadingSlots ? (
+              <p className="col-span-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                Loading slots for this date...
+              </p>
+            ) : slots.length > 0 ? (
               slots.map((slot) => (
                 <button
                   key={slot.time}
@@ -271,6 +389,111 @@ export default function EmployeeAdminPage() {
             )}
           </div>
         </div>
+          </>
+        )}
+
+        {activeSection === 'bookings' && (
+          <div className="mt-7 rounded-[1.5rem] bg-white p-6 shadow-card">
+            <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-teal-600">Patient appointments</p>
+                <h2 className="mt-2 font-display text-3xl text-ink">Manage Bookings</h2>
+              </div>
+              <button
+                type="button"
+                onClick={loadBookings}
+                disabled={isLoadingBookings}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink px-5 text-sm font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoadingBookings ? 'animate-spin' : ''}`} />
+                Refresh bookings
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr_auto]">
+              <label className="form-label">
+                Search
+                <input
+                  className="form-input"
+                  type="search"
+                  value={bookingSearch}
+                  onChange={(event) => setBookingSearch(event.target.value)}
+                  placeholder="Name or phone number"
+                />
+              </label>
+              <label className="form-label">
+                Service
+                <select
+                  className="form-input"
+                  value={bookingServiceFilter}
+                  onChange={(event) => setBookingServiceFilter(event.target.value)}
+                >
+                  <option value="">All services</option>
+                  {treatments.map((treatment) => (
+                    <option key={treatment.title} value={treatment.title}>
+                      {treatment.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="form-label">
+                Date
+                <input
+                  className="form-input"
+                  type="date"
+                  value={bookingDateFilter}
+                  onChange={(event) => setBookingDateFilter(event.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setBookingSearch('')
+                  setBookingServiceFilter('')
+                  setBookingDateFilter('')
+                }}
+                className="min-h-12 self-end rounded-full border border-teal-200 bg-white px-5 text-sm font-bold text-ink transition hover:border-teal-400 hover:bg-teal-50"
+              >
+                Clear filters
+              </button>
+            </div>
+
+            <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-100">
+              {isLoadingBookings ? (
+                <p className="px-4 py-5 text-sm text-slate-500">Loading bookings...</p>
+              ) : bookingsError ? (
+                <p role="alert" className="px-4 py-5 text-sm font-bold text-red-700">{bookingsError}</p>
+              ) : filteredBookings.length === 0 ? (
+                <p className="px-4 py-5 text-sm text-slate-500">No bookings match the current filters.</p>
+              ) : (
+                <table className="min-w-[860px] w-full border-collapse text-left text-sm">
+                  <thead className="bg-[#f5faf9] text-xs font-extrabold uppercase tracking-[0.12em] text-teal-700">
+                    <tr>
+                      <th className="px-4 py-4">Name</th>
+                      <th className="px-4 py-4">Phone Num</th>
+                      <th className="px-4 py-4">Service</th>
+                      <th className="px-4 py-4">Date</th>
+                      <th className="px-4 py-4">Appointment Time</th>
+                      <th className="px-4 py-4">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-600">
+                    {filteredBookings.map((booking) => (
+                      <tr key={`${booking.phone_num}-${booking.date}-${booking.appointment_time}`} className="bg-white">
+                        <td className="px-4 py-4 font-bold text-ink">{booking.name}</td>
+                        <td className="px-4 py-4">{booking.phone_num}</td>
+                        <td className="px-4 py-4">{booking.service}</td>
+                        <td className="px-4 py-4">{booking.date}</td>
+                        <td className="px-4 py-4">{booking.appointment_time}</td>
+                        <td className="max-w-[260px] px-4 py-4">{booking.notes || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
       </section>
     </main>
   )

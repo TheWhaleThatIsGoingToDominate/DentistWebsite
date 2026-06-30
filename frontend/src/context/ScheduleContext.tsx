@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
 export type SlotStatus = 'available' | 'blocked' | 'booked'
 
@@ -20,22 +20,7 @@ type ScheduleContextValue = {
 
 const STORAGE_KEY = 'aurora-demo-schedule'
 
-const today = new Date().toISOString().slice(0, 10)
-
-const defaultSchedule: ScheduleByDate = {
-  [today]: [
-    { time: '09:00 AM', status: 'available' },
-    { time: '09:30 AM', status: 'available' },
-    { time: '10:00 AM', status: 'blocked' },
-    { time: '10:30 AM', status: 'available' },
-    { time: '11:00 AM', status: 'booked' },
-    { time: '11:30 AM', status: 'available' },
-    { time: '12:00 PM', status: 'available' },
-    { time: '12:30 PM', status: 'blocked' },
-    { time: '01:00 PM', status: 'available' },
-    { time: '01:30 PM', status: 'available' },
-  ],
-}
+const defaultSchedule: ScheduleByDate = {}
 
 const ScheduleContext = createContext<ScheduleContextValue | null>(null)
 
@@ -59,33 +44,33 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(schedule))
   }, [schedule])
 
+  const getSlotsForDate = useCallback((date: string) => schedule[date] ?? [], [schedule])
+
+  const setSlotsForDate = useCallback((date: string, slots: AppointmentSlot[]) => {
+    setSchedule((current) => ({ ...current, [date]: slots }))
+  }, [])
+
+  const updateSlotForDate = useCallback((date: string, updatedSlot: AppointmentSlot) => {
+    setSchedule((current) => ({
+      ...current,
+      [date]: (current[date] ?? []).map((slot) =>
+        slot.time === updatedSlot.time ? updatedSlot : slot,
+      ),
+    }))
+  }, [])
+
+  const updateSlotStatus = useCallback((date: string, time: string, status: SlotStatus) => {
+    setSchedule((current) => ({
+      ...current,
+      [date]: (current[date] ?? []).map((slot) =>
+        slot.time === time ? { ...slot, status } : slot,
+      ),
+    }))
+  }, [])
+
   const value = useMemo<ScheduleContextValue>(() => {
-    const getSlotsForDate = (date: string) => schedule[date] ?? []
-
-    const setSlotsForDate = (date: string, slots: AppointmentSlot[]) => {
-      setSchedule((current) => ({ ...current, [date]: slots }))
-    }
-
-    const updateSlotForDate = (date: string, updatedSlot: AppointmentSlot) => {
-      setSchedule((current) => ({
-        ...current,
-        [date]: (current[date] ?? []).map((slot) =>
-          slot.time === updatedSlot.time ? updatedSlot : slot,
-        ),
-      }))
-    }
-
-    const updateSlotStatus = (date: string, time: string, status: SlotStatus) => {
-      setSchedule((current) => ({
-        ...current,
-        [date]: (current[date] ?? []).map((slot) =>
-          slot.time === time ? { ...slot, status } : slot,
-        ),
-      }))
-    }
-
     return { schedule, getSlotsForDate, setSlotsForDate, updateSlotForDate, updateSlotStatus }
-  }, [schedule])
+  }, [getSlotsForDate, schedule, setSlotsForDate, updateSlotForDate, updateSlotStatus])
 
   return <ScheduleContext.Provider value={value}>{children}</ScheduleContext.Provider>
 }
