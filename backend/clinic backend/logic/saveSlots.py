@@ -34,7 +34,7 @@ def save_slots(date: str, slots: list): #<copied
     lastId = (
         supabase.table("savingTheSlots")
         .select("id")
-        .eq("time", slots[-1]["time"])
+        .eq("time", slot["time"])
         .execute()
         .data
     )
