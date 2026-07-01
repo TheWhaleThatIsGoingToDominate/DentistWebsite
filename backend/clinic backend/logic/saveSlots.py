@@ -35,14 +35,14 @@ def save_slots(date: str, slots: list): #<copied
 
     theData = (
         supabase.table("savingTheSlots")
-        .select("*")
+        .select("time")
         .eq("date", date)
         .execute()
         .data
     )
 
-    for dataKey in theData:
-        if dataKey not in slots:
+    for dataKey, slotKey in theData, slots:
+        if dataKey["time"] != slotKey["time"]:
             (
             supabase.table("savingTheSlots")
             .delete()
