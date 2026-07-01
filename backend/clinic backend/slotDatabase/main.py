@@ -13,8 +13,6 @@ supabase = create_client(url, key)
 
 
 
-
-
 # import ast #the module to convert such a string "['1', '2', '3']" to a functioning list
 # data, count = response.split()
 # data = data[data.find("["):] #<<<< this the actual data of the database, represented in a list

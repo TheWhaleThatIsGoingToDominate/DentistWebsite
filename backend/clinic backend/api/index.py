@@ -41,9 +41,6 @@ class SaveTheSlots(BaseModel):
     slots: list
     date: str
 
-class loadTheSlots(BaseModel):
-    date: str
-
 
 @app.post("/employee/auth")
 def auth(verification: Verification):
@@ -99,7 +96,7 @@ def saveSlots(data: SaveTheSlots):
         )
 
 @app.get("/employee/slots")
-def load(data: loadTheSlots):
+def load(data: str):
     return load_slots(data.date)
 
 # yo, important thing here, if you want to make the thing run again,
