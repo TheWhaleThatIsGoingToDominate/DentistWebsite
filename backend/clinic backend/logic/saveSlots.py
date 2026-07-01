@@ -1,5 +1,5 @@
 #TODO: make a backend that saves the slots generated from generateSlots.py to a database
-from database.main import supabase
+from slotDatabase.main import supabase
 
 def save_slots(date: str, slots: list): #<copied
     for slot in slots:
@@ -31,6 +31,31 @@ def save_slots(date: str, slots: list): #<copied
                 .execute()
             )
 
+    lastId = (
+        supabase.table("savingTheSlots")
+        .select("id")
+        .eq("time", slots[-1]["time"])
+        .execute()
+    )
+
+    remainder = (
+        supabase.table("savingTheSlots")
+        .select("time")
+        .eq("date", date)
+        .gt("id",lastId)
+        .execute()
+        .data
+        )
+    
+    for element in remainder:
+        (
+            supabase.table("savingTheSlots")
+            .delete()
+            .eq("date", date)
+            .eq("time", element["time"])
+            .execute
+        )
+    
     return {"saved": True, "count": len(slots)}
 
 
