@@ -41,13 +41,15 @@ def save_slots(date: str, slots: list): #<copied
         .data
     )
 
-    for index, slotKey in enumerate(slots):
-        if slotKey["time"] != theData[index]["time"]:
+    new_slots = [slot["time"] for slot in slots]
+
+    for oldSlot in theData:
+        if oldSlot["time"] not in new_slots:
             (
             supabase.table("savingTheSlots")
             .delete()
             .eq("date", date)
-            .eq("time", theData[index]["time"])
+            .eq("time", oldSlot["time"])
             .execute()
         )
     return {"saved": True, "count": len(slots)}
