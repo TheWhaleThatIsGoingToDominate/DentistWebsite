@@ -17,10 +17,10 @@ def load_booking(date: str): #admin page
 def save_booking(name, phone_number, service, date, appointment_time, notes): #public booking
     key = {
         "name":name,
-        "phone number":phone_number,
+        "phone_number":phone_number,
         "service":service,
         "date":date,
-        "appointment time":appointment_time,
+        "appointment_time":appointment_time,
         "notes":notes
     } 
     (supabase.table("bookingInfo")
