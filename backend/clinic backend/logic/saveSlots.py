@@ -31,32 +31,25 @@ def save_slots(date: str, slots: list): #<copied
                 .execute()
             )
 
-    lastId = (
+    #use the idea: if the time is not in the newly generated list, delete it.
+
+    theData = (
         supabase.table("savingTheSlots")
-        .select("id")
-        .eq("time", slots[-1]["time"])
+        .select("*")
+        .eq("date", date)
         .execute()
         .data
     )
 
-    remainder = (
-        supabase.table("savingTheSlots")
-        .select("time")
-        .eq("date", date)
-        .gt("id",lastId[0]["id"]) #error here, should be fixed, lastId is a list containg a dict, not just a dict only
-        .execute()
-        .data
-        )
-    
-    for element in remainder:
-        (
+    for dataKey in theData:
+        if dataKey not in slots:
+            (
             supabase.table("savingTheSlots")
             .delete()
             .eq("date", date)
-            .eq("time", element["time"])
+            .eq("time", dataKey["time"])
             .execute()
         )
-    
     return {"saved": True, "count": len(slots)}
 
 
