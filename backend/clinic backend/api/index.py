@@ -96,8 +96,8 @@ def saveSlots(data: SaveTheSlots):
         )
 
 @app.get("/employee/slots")
-def load(data: str):
-    return load_slots(data.date)
+def load(date: str):
+    return load_slots(date)
 
 # yo, important thing here, if you want to make the thing run again,
 # using vercel, you have to make the logic in a sperate folder, the 
