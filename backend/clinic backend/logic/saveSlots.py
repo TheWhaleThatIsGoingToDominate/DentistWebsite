@@ -43,7 +43,7 @@ def save_slots(date: str, slots: list): #<copied
         supabase.table("savingTheSlots")
         .select("time")
         .eq("date", date)
-        .gt("id",lastId["id"])
+        .gt("id",lastId[0]["id"]) #error here, should be fixed, lastId is a list containg a dict, not just a dict only
         .execute()
         .data
         )
