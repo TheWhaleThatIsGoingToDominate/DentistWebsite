@@ -31,12 +31,25 @@ export type UpdateSlotStatusResponse = AppointmentSlot
 
 export type BookingRecord = {
   name: string
-  phone_num: string
+  phone_number: string
   service: string
   date: string
   appointment_time: string
   notes?: string
 }
+
+type BackendBookingRecord = {
+  name: string
+  'phone number'?: string
+  phone_number?: string
+  service: string
+  date: string
+  'appointment time'?: string
+  appointment_time?: string
+  notes?: string
+}
+
+export type SaveBookingRequest = BookingRecord
 
 async function readJsonResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -98,10 +111,34 @@ export async function updateSlotStatusInBackend(
   return readJsonResponse<UpdateSlotStatusResponse>(response)
 }
 
-export async function fetchBookingsFromBackend(): Promise<BookingRecord[]> {
-  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/bookings`, {
+export async function fetchBookingsFromBackend(date: string): Promise<BookingRecord[]> {
+  const searchParams = new URLSearchParams({ date })
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/loadBooking?${searchParams.toString()}`, {
     method: 'GET',
   })
 
-  return readJsonResponse<BookingRecord[]>(response)
+  const bookings = await readJsonResponse<BackendBookingRecord[]>(response)
+
+  return bookings.map((booking) => ({
+    name: booking.name,
+    phone_number: booking.phone_number ?? booking['phone number'] ?? '',
+    service: booking.service,
+    date: booking.date,
+    appointment_time: booking.appointment_time ?? booking['appointment time'] ?? '',
+    notes: booking.notes,
+  }))
+}
+
+export async function saveBookingToBackend(
+  requestData: SaveBookingRequest,
+): Promise<unknown> {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/booking/save`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestData),
+  })
+
+  return readJsonResponse<unknown>(response)
 }

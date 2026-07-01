@@ -112,7 +112,7 @@ def load(date: str):
             detail=str(e)
         )
 
-class Booking:
+class Booking(BaseModel):
     name: str
     phone_number: str
     service: str

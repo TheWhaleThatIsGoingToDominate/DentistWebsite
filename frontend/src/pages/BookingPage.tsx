@@ -1,21 +1,55 @@
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { CalendarCheck, CheckCircle2 } from 'lucide-react'
 import Header from '../components/Header'
 import { Button, SectionTitle } from '../components/ui'
 import { clinic, treatments } from '../data/clinic'
 import { useSchedule } from '../context/ScheduleContext'
+import { loadSlotsFromBackend, saveBookingToBackend } from '../utils/scheduleApi'
 
 const today = new Date().toISOString().slice(0, 10)
 
 export default function BookingPage() {
-  const { getSlotsForDate, updateSlotStatus } = useSchedule()
+  const { getSlotsForDate, setSlotsForDate, updateSlotStatus } = useSchedule()
   const [selectedDate, setSelectedDate] = useState(today)
   const [selectedSlot, setSelectedSlot] = useState('')
   const [submittedMessage, setSubmittedMessage] = useState('')
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false)
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false)
+  const [slotLoadError, setSlotLoadError] = useState('')
 
   const slots = useMemo(() => getSlotsForDate(selectedDate), [getSlotsForDate, selectedDate])
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    let ignoreResponse = false
+
+    const loadSlotsForDate = async () => {
+      setSlotLoadError('')
+      setIsLoadingSlots(true)
+
+      try {
+        const loadedSlots = await loadSlotsFromBackend(selectedDate)
+        if (!ignoreResponse) {
+          setSlotsForDate(selectedDate, loadedSlots)
+        }
+      } catch {
+        if (!ignoreResponse) {
+          setSlotLoadError('Could not load available times for this date.')
+        }
+      } finally {
+        if (!ignoreResponse) {
+          setIsLoadingSlots(false)
+        }
+      }
+    }
+
+    loadSlotsForDate()
+
+    return () => {
+      ignoreResponse = true
+    }
+  }, [selectedDate, setSlotsForDate])
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     if (!selectedSlot) {
@@ -23,9 +57,29 @@ export default function BookingPage() {
       return
     }
 
-    updateSlotStatus(selectedDate, selectedSlot, 'booked')
-    setSubmittedMessage('Appointment request saved locally for demo.')
-    setSelectedSlot('')
+    const formData = new FormData(event.currentTarget)
+    setIsSubmittingBooking(true)
+    setSubmittedMessage('')
+
+    try {
+      await saveBookingToBackend({
+        name: String(formData.get('name') ?? ''),
+        phone_number: String(formData.get('phone_number') ?? ''),
+        service: String(formData.get('service') ?? ''),
+        date: selectedDate,
+        appointment_time: selectedSlot,
+        notes: String(formData.get('notes') ?? ''),
+      })
+
+      updateSlotStatus(selectedDate, selectedSlot, 'booked')
+      setSubmittedMessage('Appointment request saved.')
+      setSelectedSlot('')
+      event.currentTarget.reset()
+    } catch {
+      setSubmittedMessage('Could not save appointment request. Please try again.')
+    } finally {
+      setIsSubmittingBooking(false)
+    }
   }
 
   return (
@@ -61,7 +115,7 @@ export default function BookingPage() {
               </label>
               <label className="form-label">
                 Phone number
-                <input className="form-input" name="phone" type="tel" placeholder="+971 ..." required />
+                <input className="form-input" name="phone_number" type="tel" placeholder="+971 ..." required />
               </label>
             </div>
 
@@ -94,7 +148,15 @@ export default function BookingPage() {
 
             <fieldset className="mt-7">
               <legend className="mb-3 text-sm font-extrabold text-ink">Appointment time</legend>
-              {slots.length > 0 ? (
+              {isLoadingSlots ? (
+                <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  Loading available times...
+                </p>
+              ) : slotLoadError ? (
+                <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                  {slotLoadError}
+                </p>
+              ) : slots.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {slots.map((slot) => {
                     const disabled = slot.status !== 'available'
@@ -134,8 +196,12 @@ export default function BookingPage() {
               <textarea className="form-input min-h-28 resize-none" name="notes" placeholder="Anything you would like us to know?" />
             </label>
 
-            <button type="submit" className="mt-6 min-h-12 w-full rounded-full bg-ink px-6 text-sm font-bold text-white transition hover:bg-teal-700">
-              Submit booking request
+            <button
+              type="submit"
+              disabled={isSubmittingBooking}
+              className="mt-6 min-h-12 w-full rounded-full bg-ink px-6 text-sm font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSubmittingBooking ? 'Submitting...' : 'Submit booking request'}
             </button>
 
             {submittedMessage && (

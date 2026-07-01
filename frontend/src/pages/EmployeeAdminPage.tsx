@@ -107,7 +107,7 @@ export default function EmployeeAdminPage() {
       const matchesSearch =
         !normalizedSearch ||
         booking.name.toLowerCase().includes(normalizedSearch) ||
-        booking.phone_num.toLowerCase().includes(normalizedSearch)
+        booking.phone_number.toLowerCase().includes(normalizedSearch)
       const matchesService = !bookingServiceFilter || booking.service === bookingServiceFilter
       const matchesDate = !bookingDateFilter || booking.date === bookingDateFilter
 
@@ -120,7 +120,7 @@ export default function EmployeeAdminPage() {
     setIsLoadingBookings(true)
 
     try {
-      const loadedBookings = await fetchBookingsFromBackend()
+      const loadedBookings = await fetchBookingsFromBackend(bookingDateFilter || selectedDate)
       setBookings(loadedBookings)
     } catch {
       setBookings([])
@@ -128,7 +128,7 @@ export default function EmployeeAdminPage() {
     } finally {
       setIsLoadingBookings(false)
     }
-  }, [])
+  }, [bookingDateFilter, selectedDate])
 
   useEffect(() => {
     if (!hasAccess) {
@@ -451,6 +451,7 @@ export default function EmployeeAdminPage() {
                   setBookingSearch('')
                   setBookingServiceFilter('')
                   setBookingDateFilter('')
+                  setBookings([])
                 }}
                 className="min-h-12 self-end rounded-full border border-teal-200 bg-white px-5 text-sm font-bold text-ink transition hover:border-teal-400 hover:bg-teal-50"
               >
@@ -479,9 +480,9 @@ export default function EmployeeAdminPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-600">
                     {filteredBookings.map((booking) => (
-                      <tr key={`${booking.phone_num}-${booking.date}-${booking.appointment_time}`} className="bg-white">
+                      <tr key={`${booking.phone_number}-${booking.date}-${booking.appointment_time}`} className="bg-white">
                         <td className="px-4 py-4 font-bold text-ink">{booking.name}</td>
-                        <td className="px-4 py-4">{booking.phone_num}</td>
+                        <td className="px-4 py-4">{booking.phone_number}</td>
                         <td className="px-4 py-4">{booking.service}</td>
                         <td className="px-4 py-4">{booking.date}</td>
                         <td className="px-4 py-4">{booking.appointment_time}</td>
