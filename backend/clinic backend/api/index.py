@@ -126,12 +126,12 @@ class Booking(BaseModel):
 def saveBooking(data: Booking):
     try:
         return save_booking(
-            data.appointment_time, 
-            data.date, 
-            data.name,
-            data.notes,
-            data.phone_number,
-            data.service
+            appointment_time=data.appointment_time, 
+            date=data.date, 
+            name=data.name,
+            notes=data.notes,
+            phone_number=data.phone_number,
+            service=data.service
             )
     except Exception as e:
         raise HTTPException(

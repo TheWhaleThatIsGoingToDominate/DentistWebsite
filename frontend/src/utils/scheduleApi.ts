@@ -17,6 +17,10 @@ export type GenerateSlotsResponse = {
 
 export type LoadSlotsResponse = AppointmentSlot[]
 
+type PublicBookingSlot = {
+  time: string
+}
+
 export type SaveSlotsRequest = {
   date: string
   slots: AppointmentSlot[]
@@ -81,6 +85,16 @@ export async function loadSlotsFromBackend(date: string): Promise<LoadSlotsRespo
   })
 
   return readJsonResponse<LoadSlotsResponse>(response)
+}
+
+export async function loadPublicBookingSlotsFromBackend(date: string): Promise<LoadSlotsResponse> {
+  const searchParams = new URLSearchParams({ date })
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/booking/slots?${searchParams.toString()}`, {
+    method: 'GET',
+  })
+
+  const slots = await readJsonResponse<PublicBookingSlot[]>(response)
+  return slots.map((slot) => ({ time: slot.time, status: 'available' }))
 }
 
 export async function saveSlotsToBackend(

@@ -4,7 +4,7 @@ import Header from '../components/Header'
 import { Button, SectionTitle } from '../components/ui'
 import { clinic, treatments } from '../data/clinic'
 import { useSchedule } from '../context/ScheduleContext'
-import { loadSlotsFromBackend, saveBookingToBackend } from '../utils/scheduleApi'
+import { loadPublicBookingSlotsFromBackend, saveBookingToBackend } from '../utils/scheduleApi'
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -27,7 +27,7 @@ export default function BookingPage() {
       setIsLoadingSlots(true)
 
       try {
-        const loadedSlots = await loadSlotsFromBackend(selectedDate)
+        const loadedSlots = await loadPublicBookingSlotsFromBackend(selectedDate)
         if (!ignoreResponse) {
           setSlotsForDate(selectedDate, loadedSlots)
         }
