@@ -27,3 +27,5 @@ def save_booking(name, phone_number, service, date, appointment_time, notes): #p
     .insert(key)
     .execute()
     )
+
+    return {"saved":True}

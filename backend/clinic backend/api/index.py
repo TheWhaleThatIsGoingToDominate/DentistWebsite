@@ -1,9 +1,11 @@
+#imports
 from fastapi import FastAPI, HTTPException, status
 from logic.authentication import Authentication
 from logic.generateSlots import generate_slots
 from logic.changeStatusOfSlot import change_status
 from logic.saveSlots import save_slots #< the function that handles saving
-from logic.loadSlots import load_slots
+from logic.loadSlots import load_slotsADMINPAGE, load_booking_PBOOKINGPAGE
+from logic.clientBooking import load_booking, save_booking
 #    ^^^^ new importing method, you can use {name of folder}.name of file to import a certain file
 # that is outside of the folder, but is inside the parent folder
 from pydantic import BaseModel
@@ -97,11 +99,11 @@ def saveSlots(data: SaveTheSlots):
 
 @app.get("/employee/slots")
 def load(date: str):
-    return load_slots(date)
+    return load_slotsADMINPAGE(date)
 
 
 
-from logic.clientBooking import load_booking, save_booking
+
 @app.get("/employee/loadBooking")
 def load(date: str):
     try:
@@ -137,6 +139,9 @@ def saveBooking(data: Booking):
             detail=str(e)
         )
 
+@app.get("/booking/slots")
+def loadtheslots(date: str):
+    return load_booking_PBOOKINGPAGE(date) 
 # yo, important thing here, if you want to make the thing run again,
 # using vercel, you have to make the logic in a sperate folder, the 
 # api in a sepereate folder called "api", while listing the requirements
