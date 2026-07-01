@@ -41,13 +41,13 @@ def save_slots(date: str, slots: list): #<copied
         .data
     )
 
-    for dataKey, slotKey in theData, slots:
-        if dataKey["time"] != slotKey["time"]:
+    for index, slotKey in enumerate(slots):
+        if slotKey["time"] != theData[index]["time"]:
             (
             supabase.table("savingTheSlots")
             .delete()
             .eq("date", date)
-            .eq("time", dataKey["time"])
+            .eq("time", theData[index]["time"])
             .execute()
         )
     return {"saved": True, "count": len(slots)}
