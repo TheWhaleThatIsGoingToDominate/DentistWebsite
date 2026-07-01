@@ -54,7 +54,7 @@ def save_slots(date: str, slots: list): #<copied
             .delete()
             .eq("date", date)
             .eq("time", element["time"])
-            .execute
+            .execute()
         )
     
     return {"saved": True, "count": len(slots)}
