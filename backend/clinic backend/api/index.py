@@ -99,6 +99,44 @@ def saveSlots(data: SaveTheSlots):
 def load(date: str):
     return load_slots(date)
 
+
+
+from logic.clientBooking import load_booking, save_booking
+@app.get("/employee/loadBooking")
+def load(date: str):
+    try:
+        return load_booking(date)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+class Booking:
+    name: str
+    phone_number: str
+    service: str
+    date: str
+    appointment_time: str
+    notes: str
+
+@app.post("/booking/save")
+def saveBooking(data: Booking):
+    try:
+        return save_booking(
+            data.appointment_time, 
+            data.date, 
+            data.name,
+            data.notes,
+            data.phone_number,
+            data.service
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
 # yo, important thing here, if you want to make the thing run again,
 # using vercel, you have to make the logic in a sperate folder, the 
 # api in a sepereate folder called "api", while listing the requirements
