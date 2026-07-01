@@ -3,6 +3,7 @@ from logic.authentication import Authentication
 from logic.generateSlots import generate_slots
 from logic.changeStatusOfSlot import change_status
 from logic.saveSlots import save_slots #< the function that handles saving
+from logic.loadSlots import load_slots
 #    ^^^^ new importing method, you can use {name of folder}.name of file to import a certain file
 # that is outside of the folder, but is inside the parent folder
 from pydantic import BaseModel
@@ -39,6 +40,10 @@ class changeStatus(BaseModel):
 class SaveTheSlots(BaseModel):
     slots: list
     date: str
+
+class loadTheSlots(BaseModel):
+    date: str
+
 
 @app.post("/employee/auth")
 def auth(verification: Verification):
@@ -93,6 +98,9 @@ def saveSlots(data: SaveTheSlots):
             detail=str(e)
         )
 
+@app.get("/employee/slots")
+def load(data: loadTheSlots):
+    return load_slots(data.date)
 
 # yo, important thing here, if you want to make the thing run again,
 # using vercel, you have to make the logic in a sperate folder, the 
