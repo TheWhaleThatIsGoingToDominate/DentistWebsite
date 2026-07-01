@@ -98,14 +98,14 @@ def saveSlots(data: SaveTheSlots):
         )
 
 @app.get("/employee/slots")
-def load(date: str):
+def loadADMIN(date: str):
     return load_slotsADMINPAGE(date)
 
 
 
 
 @app.get("/employee/loadBooking")
-def load(date: str):
+def loadPUBLIC(date: str):
     try:
         return load_booking(date)
     except Exception as e:
