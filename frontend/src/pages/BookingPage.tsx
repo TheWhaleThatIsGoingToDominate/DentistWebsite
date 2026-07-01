@@ -57,7 +57,8 @@ export default function BookingPage() {
       return
     }
 
-    const formData = new FormData(event.currentTarget)
+    const form = event.currentTarget
+    const formData = new FormData(form)
     setIsSubmittingBooking(true)
     setSubmittedMessage('')
 
@@ -74,7 +75,7 @@ export default function BookingPage() {
       updateSlotStatus(selectedDate, selectedSlot, 'booked')
       setSubmittedMessage('Appointment request saved.')
       setSelectedSlot('')
-      event.currentTarget.reset()
+      form.reset()
     } catch {
       setSubmittedMessage('Could not save appointment request. Please try again.')
     } finally {
