@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { CalendarCheck, CheckCircle2 } from 'lucide-react'
+import { AlertCircle, CalendarCheck, CheckCircle2 } from 'lucide-react'
 import Header from '../components/Header'
 import { Button, SectionTitle } from '../components/ui'
 import { clinic, treatments } from '../data/clinic'
@@ -9,11 +9,16 @@ import { getEgyptDateInputValue } from '../utils/date'
 
 const today = getEgyptDateInputValue()
 
+type SubmissionNotice = {
+  tone: 'success' | 'error'
+  text: string
+}
+
 export default function BookingPage() {
   const { getSlotsForDate, setSlotsForDate, updateSlotStatus } = useSchedule()
   const [selectedDate, setSelectedDate] = useState(today)
   const [selectedSlot, setSelectedSlot] = useState('')
-  const [submittedMessage, setSubmittedMessage] = useState('')
+  const [submissionNotice, setSubmissionNotice] = useState<SubmissionNotice | null>(null)
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false)
   const [slotLoadError, setSlotLoadError] = useState('')
@@ -54,14 +59,14 @@ export default function BookingPage() {
     event.preventDefault()
 
     if (!selectedSlot) {
-      setSubmittedMessage('Please choose an available appointment slot.')
+      setSubmissionNotice({ tone: 'error', text: 'Please choose an available appointment slot.' })
       return
     }
 
     const form = event.currentTarget
     const formData = new FormData(form)
     setIsSubmittingBooking(true)
-    setSubmittedMessage('')
+    setSubmissionNotice(null)
 
     try {
       await saveBookingToBackend({
@@ -74,11 +79,14 @@ export default function BookingPage() {
       })
 
       updateSlotStatus(selectedDate, selectedSlot, 'booked')
-      setSubmittedMessage('Appointment request saved.')
+      setSubmissionNotice({ tone: 'success', text: 'Appointment request saved.' })
       setSelectedSlot('')
       form.reset()
     } catch (error) {
-      setSubmittedMessage(error instanceof Error ? error.message : 'Could not save appointment request. Please try again.')
+      setSubmissionNotice({
+        tone: 'error',
+        text: error instanceof Error ? error.message : 'Could not save appointment request. Please try again.',
+      })
     } finally {
       setIsSubmittingBooking(false)
     }
@@ -141,7 +149,7 @@ export default function BookingPage() {
                   onChange={(event) => {
                     setSelectedDate(event.target.value)
                     setSelectedSlot('')
-                    setSubmittedMessage('')
+                    setSubmissionNotice(null)
                   }}
                   required
                 />
@@ -170,7 +178,7 @@ export default function BookingPage() {
                         disabled={disabled}
                         onClick={() => {
                           setSelectedSlot(slot.time)
-                          setSubmittedMessage('')
+                          setSubmissionNotice(null)
                         }}
                         className={`min-h-14 rounded-xl border px-3 text-sm font-bold transition ${
                           selected
@@ -206,10 +214,20 @@ export default function BookingPage() {
               {isSubmittingBooking ? 'Submitting...' : 'Submit booking request'}
             </button>
 
-            {submittedMessage && (
-              <div className="mt-4 flex items-center gap-2 rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm font-bold text-teal-800">
-                <CheckCircle2 className="h-4 w-4" />
-                {submittedMessage}
+            {submissionNotice && (
+              <div
+                className={`mt-4 flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${
+                  submissionNotice.tone === 'success'
+                    ? 'border-teal-100 bg-teal-50 text-teal-800'
+                    : 'border-red-100 bg-red-50 text-red-700'
+                }`}
+              >
+                {submissionNotice.tone === 'success' ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <AlertCircle className="h-4 w-4" />
+                )}
+                {submissionNotice.text}
               </div>
             )}
 
