@@ -11,7 +11,7 @@ def save_booking(name, phone_number, service, date, appointment_time, notes=None
     if not 3 < len(name) < 20:
         raise Exception("Invalid name. Enter your name correctly")
     else:
-        if len(phone_number) != 10 or len(phone_number) != 11:
+        if len(phone_number) != 10 and len(phone_number) != 11:
             raise Exception("Invalid phone number.")
 
     #update the slot from available to booked, then save the booking
