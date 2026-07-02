@@ -6,13 +6,13 @@ from database.main import supabase
 from logic.slots import update_status
 
 
-def save_booking(name, phone_number, service, date, appointment_time, notes=None): #public booking
+def save_booking(name: str, phone_number, service, date, appointment_time, notes=None): #public booking
     #confirming the name and the phone number to be legitimate
-    if not 3 < len(name) < 20:
-        raise Exception("Invalid name. Enter your name correctly")
-    else:
-        if len(phone_number) != 10 and len(phone_number) != 11:
-            raise Exception("Invalid phone number.")
+    for subname in name.split():
+        if not 3 < len(name) < 20:
+            raise Exception("Invalid name. Enter your name correctly")
+    if len(phone_number) != 10 and len(phone_number) != 11:
+        raise Exception("Invalid phone number.")
 
     #update the slot from available to booked, then save the booking
     if update_status(date, appointment_time) == {"updated":True}:
