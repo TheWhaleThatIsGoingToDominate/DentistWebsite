@@ -31,7 +31,9 @@ export type SaveSlotsResponse = {
   count: number
 }
 
-export type UpdateSlotStatusResponse = AppointmentSlot
+export type UpdateSlotStatusResponse = AppointmentSlot | {
+  message: string
+}
 
 export type BookingRecord = {
   name: string

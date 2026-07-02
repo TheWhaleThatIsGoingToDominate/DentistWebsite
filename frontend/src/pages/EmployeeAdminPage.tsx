@@ -214,6 +214,11 @@ export default function EmployeeAdminPage() {
     try {
       const updatedSlot = await updateSlotStatusInBackend(slot)
 
+      if ('message' in updatedSlot) {
+        setSaveMessage(updatedSlot.message)
+        return
+      }
+
       updateSlotForDate(selectedDate, updatedSlot)
     } catch {
       updateSlotStatus(
