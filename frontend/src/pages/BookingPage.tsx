@@ -77,8 +77,8 @@ export default function BookingPage() {
       setSubmittedMessage('Appointment request saved.')
       setSelectedSlot('')
       form.reset()
-    } catch {
-      setSubmittedMessage('Could not save appointment request. Please try again.')
+    } catch (error) {
+      setSubmittedMessage(error instanceof Error ? error.message : 'Could not save appointment request. Please try again.')
     } finally {
       setIsSubmittingBooking(false)
     }

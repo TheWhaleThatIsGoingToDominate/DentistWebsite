@@ -57,9 +57,23 @@ type BackendBookingRecord = {
 
 export type SaveBookingRequest = BookingRecord
 
+type ApiErrorResponse = {
+  detail?: string
+  message?: string
+}
+
 async function readJsonResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    throw new Error(`Schedule API request failed with status ${response.status}`)
+    let errorMessage = `Schedule API request failed with status ${response.status}`
+
+    try {
+      const data = await response.json() as ApiErrorResponse
+      errorMessage = data.detail ?? data.message ?? errorMessage
+    } catch {
+      // Keep the generic status message when the backend does not return JSON.
+    }
+
+    throw new Error(errorMessage)
   }
 
   return response.json() as Promise<T>
