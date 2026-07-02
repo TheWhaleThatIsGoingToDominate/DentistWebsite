@@ -5,8 +5,9 @@ import { Button, SectionTitle } from '../components/ui'
 import { clinic, treatments } from '../data/clinic'
 import { useSchedule } from '../context/ScheduleContext'
 import { loadPublicBookingSlotsFromBackend, saveBookingToBackend } from '../utils/scheduleApi'
+import { getEgyptDateInputValue } from '../utils/date'
 
-const today = new Date().toISOString().slice(0, 10)
+const today = getEgyptDateInputValue()
 
 export default function BookingPage() {
   const { getSlotsForDate, setSlotsForDate, updateSlotStatus } = useSchedule()

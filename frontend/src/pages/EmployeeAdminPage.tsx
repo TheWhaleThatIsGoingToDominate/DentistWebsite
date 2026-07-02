@@ -11,8 +11,9 @@ import {
   updateSlotStatusInBackend,
 } from '../utils/scheduleApi'
 import { treatments } from '../data/clinic'
+import { getEgyptDateInputValue } from '../utils/date'
 
-const today = new Date().toISOString().slice(0, 10)
+const today = getEgyptDateInputValue()
 
 type AdminSection = 'slots' | 'bookings'
 
