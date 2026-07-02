@@ -1,9 +1,10 @@
 #imports
 from fastapi import FastAPI, HTTPException, status
 from logic.authentication import Authentication
-from logic.slots import change_status, generate_slots, save_slots, load_booking_PBOOKINGPAGE, load_slotsADMINPAGE
+from logic.slots import change_status,update_status, generate_slots, save_slots, load_booking_PBOOKINGPAGE, load_slotsADMINPAGE
 from logic.clientBooking import save_booking
 from logic.adminBooking import load_booking
+from database.main import supabase
 #    ^^^^ new importing method, you can use {name of folder}.name of file to import a certain file
 # that is outside of the folder, but is inside the parent folder
 from pydantic import BaseModel
@@ -124,13 +125,14 @@ class Booking(BaseModel):
 def saveBooking(data: Booking):
     try:
         return save_booking(
-            appointment_time=data.appointment_time, 
-            date=data.date, 
-            name=data.name,
-            notes=data.notes,
-            phone_number=data.phone_number,
-            service=data.service
-            )
+        appointment_time=data.appointment_time, 
+        date=data.date, 
+        name=data.name,
+        notes=data.notes,
+        phone_number=data.phone_number,
+        service=data.service
+        )
+
     except Exception as e:
         raise HTTPException(
             status_code=500,

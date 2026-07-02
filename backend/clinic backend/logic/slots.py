@@ -81,10 +81,36 @@ def change_status(key: dict):
     #todo: #make a condition that relies on the backend of the bookers, to verify if the status is booked or not
     if key["status"] == "available":
         key["status"] = "blocked"
+    elif key["status"] == "booked":
+        return {"mesasge":"This slot is already booked and cannot be changed."}
+        #notify the admin that they cannot change this slot cause it is booked
     else:
         key["status"] = "available"
     return key
 
+
+#updating status of slot relative to booking
+def update_status(date: str, appointment_time: str):
+    slot = (
+        supabase.table("savingTheSlots")
+        .select("time", "status")
+        .eq("date", date)
+        .eq("time", appointment_time)
+        .eq("status", "available")
+        .execute()
+        .data
+    )
+    if slot:
+        (
+            supabase.table("savingTheSlots")
+            .update({ "status":"booked"})
+            .eq("date", date)
+            .eq("time", appointment_time)
+            .execute()
+        )
+        return  {"updated":True}
+    else:
+        return {"updated":False}
 
 #slot saving after generation in admin page
 def save_slots(date: str, slots: list): #<copied
