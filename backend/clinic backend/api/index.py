@@ -1,10 +1,7 @@
 #imports
 from fastapi import FastAPI, HTTPException, status
 from logic.authentication import Authentication
-from logic.generateSlots import generate_slots
-from logic.changeStatusOfSlot import change_status
-from logic.saveSlots import save_slots #< the function that handles saving
-from logic.loadSlots import load_slotsADMINPAGE, load_booking_PBOOKINGPAGE
+from logic.slots import change_status, generate_slots, save_slots, load_booking_PBOOKINGPAGE, load_slotsADMINPAGE
 from logic.clientBooking import load_booking, save_booking
 #    ^^^^ new importing method, you can use {name of folder}.name of file to import a certain file
 # that is outside of the folder, but is inside the parent folder
