@@ -2,7 +2,8 @@
 from fastapi import FastAPI, HTTPException, status
 from logic.authentication import Authentication
 from logic.slots import change_status, generate_slots, save_slots, load_booking_PBOOKINGPAGE, load_slotsADMINPAGE
-from logic.clientBooking import load_booking, save_booking
+from logic.clientBooking import save_booking
+from logic.adminBooking import load_booking
 #    ^^^^ new importing method, you can use {name of folder}.name of file to import a certain file
 # that is outside of the folder, but is inside the parent folder
 from pydantic import BaseModel
