@@ -3,7 +3,7 @@
 #same schedule or the same name
 
 from database.main import supabase
-from slots import update_status
+from logic.slots import update_status
 
 
 def save_booking(name, phone_number, service, date, appointment_time, notes=None): #public booking
