@@ -8,3 +8,6 @@ def load_booking(date: str): #admin page
         .execute()
         .data
     )
+
+
+

@@ -1,7 +1,8 @@
 #imports
-from fastapi import FastAPI, HTTPException, status
+import os
+from fastapi import FastAPI, HTTPException, status, Header
 from logic.authentication import Authentication
-from logic.slots import change_status,update_status, generate_slots, save_slots, load_booking_PBOOKINGPAGE, load_slotsADMINPAGE
+from logic.slots import change_status, generate_slots, slots_cleanup, save_slots, load_booking_PBOOKINGPAGE, load_slotsADMINPAGE
 from logic.clientBooking import save_booking
 from logic.adminBooking import load_booking
 from database.main import supabase
@@ -142,6 +143,22 @@ def saveBooking(data: Booking):
 @app.get("/booking/slots")
 def loadtheslots(date: str):
     return load_booking_PBOOKINGPAGE(date) 
+
+@app.get("/slotsDailyCleanup") #< for this one vercel itself sends a get request, so we have to match
+def cleanup(authorization: str  | None = Header(default=None)):
+    try:
+        cron_secret = os.environ["CRON_SECRET"]
+        if authorization != f"Bearer {cron_secret}":
+            raise HTTPException(status_code=403, detail="not allowed")
+        else:
+            return slots_cleanup()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        ) 
+    
+
 # yo, important thing here, if you want to make the thing run again,
 # using vercel, you have to make the logic in a sperate folder, the 
 # api in a sepereate folder called "api", while listing the requirements

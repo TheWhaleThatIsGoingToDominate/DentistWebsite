@@ -1,4 +1,6 @@
 from database.main import supabase
+from datetime import datetime, date
+from zoneinfo import ZoneInfo
 
 #loading slots, in the admin page and the public booking page
 def load_slotsADMINPAGE(date):
@@ -165,3 +167,30 @@ def save_slots(date: str, slots: list): #<copied
             .execute()
         )
     return {"saved": True, "count": len(slots)}
+
+
+#cleaning old slots
+def slots_cleanup():
+    egypt_time = datetime.now(ZoneInfo("Africa/Cairo"))
+    dateOfToday = egypt_time.date()
+
+    slotsDataDates = (
+        supabase.table("savingTheSlots")
+        .select("date")
+        .execute()
+        .data
+    )
+
+    slotsDataDates = [datetime.strptime(theDate["date"], "%Y-%m-%d").date()  for theDate in slotsDataDates]
+
+    #loop through the list and check if the date is in the past and delete the related element
+    for theDate in slotsDataDates:
+        if theDate < dateOfToday:
+            (
+                supabase.table("savingTheSlots")
+                .delete()
+                .eq("date", str(theDate))
+                .execute()
+            )
+
+    return {"cleaned":True}
