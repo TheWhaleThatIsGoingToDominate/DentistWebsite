@@ -11,6 +11,7 @@ import { Button, Reveal, SectionTitle } from './components/ui'
 import { ScheduleProvider } from './context/ScheduleContext'
 import { clinic, faqs, images, navLinks, pricing, testimonials, treatments, whatsappUrl } from './data/clinic'
 import BookingPage from './pages/BookingPage'
+import BookingStatusPage from './pages/BookingStatusPage'
 import EmployeeAdminPage from './pages/EmployeeAdminPage'
 
 const treatmentIcons = { Sparkles, Sun, CircleDot, Gem, ShieldCheck, ScanLine }
@@ -51,6 +52,7 @@ function Hero() {
           </p>
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <Button href="/booking" className="sm:min-w-48">Book Appointment</Button>
+            <Button href="/booking-status" variant="secondary" className="sm:min-w-48">Track Booking</Button>
             <Button href="#treatments" variant="secondary" className="sm:min-w-48">View Treatments</Button>
           </div>
           <div className="mt-11 grid grid-cols-3 gap-3 border-t border-teal-200/80 pt-7">
@@ -437,6 +439,15 @@ export default function App() {
     return (
       <ScheduleProvider>
         <BookingPage />
+        <Chatbot />
+      </ScheduleProvider>
+    )
+  }
+
+  if (route === '/booking-status') {
+    return (
+      <ScheduleProvider>
+        <BookingStatusPage />
         <Chatbot />
       </ScheduleProvider>
     )

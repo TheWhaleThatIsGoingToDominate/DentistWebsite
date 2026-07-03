@@ -69,7 +69,7 @@ export default function BookingPage() {
     setSubmissionNotice(null)
 
     try {
-      await saveBookingToBackend({
+      const savedBooking = await saveBookingToBackend({
         name: String(formData.get('name') ?? ''),
         phone_number: String(formData.get('phone_number') ?? ''),
         service: String(formData.get('service') ?? ''),
@@ -79,7 +79,13 @@ export default function BookingPage() {
       })
 
       updateSlotStatus(selectedDate, selectedSlot, 'booked')
-      setSubmissionNotice({ tone: 'success', text: 'Appointment request saved.' })
+      const bookingReference = savedBooking.booking_reference ?? savedBooking.reference_code
+      setSubmissionNotice({
+        tone: 'success',
+        text: bookingReference
+          ? `Appointment request saved. Your reference is ${bookingReference}.`
+          : 'Appointment request saved.',
+      })
       setSelectedSlot('')
       form.reset()
     } catch (error) {
@@ -232,6 +238,7 @@ export default function BookingPage() {
             )}
 
             <Button href="/" variant="secondary" className="mt-4 w-full">Back to website</Button>
+            <Button href="/booking-status" variant="secondary" className="mt-3 w-full">Track existing booking</Button>
           </form>
         </section>
       </main>

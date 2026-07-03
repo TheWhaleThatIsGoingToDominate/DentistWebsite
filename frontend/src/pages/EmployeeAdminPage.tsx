@@ -4,10 +4,13 @@ import { AppointmentSlot, useSchedule } from '../context/ScheduleContext'
 import { checkEmployeeAccessKey } from '../utils/employeeAccess'
 import {
   BookingRecord,
+  BookingStatus,
+  deleteBookingInBackend,
   fetchBookingsFromBackend,
   generateSlotsFromBackend,
   loadSlotsFromBackend,
   saveSlotsToBackend,
+  updateBookingStatusInBackend,
   updateSlotStatusInBackend,
 } from '../utils/scheduleApi'
 import { treatments } from '../data/clinic'
@@ -16,6 +19,15 @@ import { getEgyptDateInputValue } from '../utils/date'
 const today = getEgyptDateInputValue()
 
 type AdminSection = 'slots' | 'bookings'
+
+const bookingStatuses: BookingStatus[] = ['scheduled', 'completed', 'cancelled', 'no_show']
+
+const bookingStatusLabels: Record<BookingStatus, string> = {
+  scheduled: 'Scheduled',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  no_show: 'No-show',
+}
 
 function timeToMinutes(time: string) {
   const twelveHourMatch = time.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i)
@@ -98,6 +110,9 @@ export default function EmployeeAdminPage() {
   const [bookingSearch, setBookingSearch] = useState('')
   const [bookingServiceFilter, setBookingServiceFilter] = useState('')
   const [bookingDateFilter, setBookingDateFilter] = useState('')
+  const [bookingStatusFilter, setBookingStatusFilter] = useState('')
+  const [bookingActionMessage, setBookingActionMessage] = useState('')
+  const [updatingBookingReference, setUpdatingBookingReference] = useState('')
 
   const slots = getSlotsForDate(selectedDate)
 
@@ -111,10 +126,11 @@ export default function EmployeeAdminPage() {
         booking.phone_number.toLowerCase().includes(normalizedSearch)
       const matchesService = !bookingServiceFilter || booking.service === bookingServiceFilter
       const matchesDate = !bookingDateFilter || booking.date === bookingDateFilter
+      const matchesStatus = !bookingStatusFilter || booking.status === bookingStatusFilter
 
-      return matchesSearch && matchesService && matchesDate
+      return matchesSearch && matchesService && matchesDate && matchesStatus
     })
-  }, [bookingDateFilter, bookingSearch, bookingServiceFilter, bookings])
+  }, [bookingDateFilter, bookingSearch, bookingServiceFilter, bookingStatusFilter, bookings])
 
   const loadBookings = useCallback(async () => {
     setBookingsError('')
@@ -247,6 +263,63 @@ export default function EmployeeAdminPage() {
       setSaveMessage('Could not save schedule to backend.')
     } finally {
       setIsSavingSlots(false)
+    }
+  }
+
+  const handleBookingStatusChange = async (booking: BookingRecord, status: BookingStatus) => {
+    if (!booking.booking_reference) {
+      setBookingActionMessage('This booking does not have a reference code yet.')
+      return
+    }
+
+    setBookingActionMessage('')
+    setUpdatingBookingReference(booking.booking_reference)
+
+    try {
+      const response = await updateBookingStatusInBackend({
+        booking_reference: booking.booking_reference,
+        status,
+      })
+
+      if ('message' in response) {
+        setBookingActionMessage(response.message)
+        setBookings((current) =>
+          current.map((item) =>
+            item.booking_reference === booking.booking_reference ? { ...item, status } : item,
+          ),
+        )
+      } else {
+        setBookings((current) =>
+          current.map((item) =>
+            item.booking_reference === booking.booking_reference ? response : item,
+          ),
+        )
+        setBookingActionMessage('Booking status updated.')
+      }
+    } catch {
+      setBookingActionMessage('Could not update booking status.')
+    } finally {
+      setUpdatingBookingReference('')
+    }
+  }
+
+  const handleDeleteBooking = async (booking: BookingRecord) => {
+    if (!booking.booking_reference) {
+      setBookingActionMessage('This booking does not have a reference code yet.')
+      return
+    }
+
+    setBookingActionMessage('')
+    setUpdatingBookingReference(booking.booking_reference)
+
+    try {
+      const response = await deleteBookingInBackend(booking.booking_reference)
+      setBookings((current) => current.filter((item) => item.booking_reference !== booking.booking_reference))
+      setBookingActionMessage(response.message ?? 'Booking deleted.')
+    } catch {
+      setBookingActionMessage('Could not delete booking.')
+    } finally {
+      setUpdatingBookingReference('')
     }
   }
 
@@ -416,7 +489,7 @@ export default function EmployeeAdminPage() {
               </button>
             </div>
 
-            <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr_auto]">
+            <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr_1fr_auto]">
               <label className="form-label">
                 Search
                 <input
@@ -451,19 +524,42 @@ export default function EmployeeAdminPage() {
                   onChange={(event) => setBookingDateFilter(event.target.value)}
                 />
               </label>
+              <label className="form-label">
+                Status
+                <select
+                  className="form-input"
+                  value={bookingStatusFilter}
+                  onChange={(event) => setBookingStatusFilter(event.target.value)}
+                >
+                  <option value="">All statuses</option>
+                  {bookingStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {bookingStatusLabels[status]}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="button"
                 onClick={() => {
                   setBookingSearch('')
                   setBookingServiceFilter('')
                   setBookingDateFilter('')
+                  setBookingStatusFilter('')
                   setBookings([])
+                  setBookingActionMessage('')
                 }}
                 className="min-h-12 self-end rounded-full border border-teal-200 bg-white px-5 text-sm font-bold text-ink transition hover:border-teal-400 hover:bg-teal-50"
               >
                 Clear filters
               </button>
             </div>
+
+            {bookingActionMessage && (
+              <p className="mt-4 rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm font-bold text-teal-800">
+                {bookingActionMessage}
+              </p>
+            )}
 
             <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-100">
               {isLoadingBookings ? (
@@ -473,26 +569,54 @@ export default function EmployeeAdminPage() {
               ) : filteredBookings.length === 0 ? (
                 <p className="px-4 py-5 text-sm text-slate-500">No bookings match the current filters.</p>
               ) : (
-                <table className="min-w-[860px] w-full border-collapse text-left text-sm">
+                <table className="min-w-[1160px] w-full border-collapse text-left text-sm">
                   <thead className="bg-[#f5faf9] text-xs font-extrabold uppercase tracking-[0.12em] text-teal-700">
                     <tr>
+                      <th className="px-4 py-4">Reference</th>
                       <th className="px-4 py-4">Name</th>
                       <th className="px-4 py-4">Phone Num</th>
                       <th className="px-4 py-4">Service</th>
                       <th className="px-4 py-4">Date</th>
                       <th className="px-4 py-4">Appointment Time</th>
+                      <th className="px-4 py-4">Status</th>
                       <th className="px-4 py-4">Notes</th>
+                      <th className="px-4 py-4">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-600">
                     {filteredBookings.map((booking) => (
-                      <tr key={`${booking.phone_number}-${booking.date}-${booking.appointment_time}`} className="bg-white">
+                      <tr key={booking.booking_reference ?? `${booking.phone_number}-${booking.date}-${booking.appointment_time}`} className="bg-white">
+                        <td className="px-4 py-4 font-bold text-ink">{booking.booking_reference ?? 'Missing'}</td>
                         <td className="px-4 py-4 font-bold text-ink">{booking.name}</td>
                         <td className="px-4 py-4">{booking.phone_number}</td>
                         <td className="px-4 py-4">{booking.service}</td>
                         <td className="px-4 py-4">{booking.date}</td>
                         <td className="px-4 py-4">{booking.appointment_time}</td>
+                        <td className="px-4 py-4">
+                          <select
+                            className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-ink"
+                            value={booking.status ?? 'scheduled'}
+                            onChange={(event) => handleBookingStatusChange(booking, event.target.value as BookingStatus)}
+                            disabled={!booking.booking_reference || updatingBookingReference === booking.booking_reference}
+                          >
+                            {bookingStatuses.map((status) => (
+                              <option key={status} value={status}>
+                                {bookingStatusLabels[status]}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
                         <td className="max-w-[260px] px-4 py-4">{booking.notes || '—'}</td>
+                        <td className="px-4 py-4">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBooking(booking)}
+                            disabled={!booking.booking_reference || updatingBookingReference === booking.booking_reference}
+                            className="min-h-10 rounded-full border border-red-100 bg-white px-4 text-xs font-extrabold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

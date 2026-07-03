@@ -36,15 +36,22 @@ export type UpdateSlotStatusResponse = AppointmentSlot | {
 }
 
 export type BookingRecord = {
+  booking_reference?: string
   name: string
   phone_number: string
   service: string
   date: string
   appointment_time: string
+  status?: BookingStatus
   notes?: string
 }
 
+export type BookingStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show'
+
 type BackendBookingRecord = {
+  booking_reference?: string
+  reference_code?: string
+  id?: string
   name: string
   'phone number'?: string
   phone_number?: string
@@ -52,14 +59,45 @@ type BackendBookingRecord = {
   date: string
   'appointment time'?: string
   appointment_time?: string
+  status?: BookingStatus
   notes?: string
 }
 
 export type SaveBookingRequest = BookingRecord
 
+export type SaveBookingResponse = {
+  saved?: boolean
+  booking_reference?: string
+  reference_code?: string
+  message?: string
+}
+
+export type TrackBookingRequest = {
+  booking_reference: string
+  phone_number: string
+}
+
+export type UpdateBookingStatusRequest = {
+  booking_reference: string
+  status: BookingStatus
+}
+
 type ApiErrorResponse = {
   detail?: string
   message?: string
+}
+
+function normalizeBookingRecord(booking: BackendBookingRecord): BookingRecord {
+  return {
+    booking_reference: booking.booking_reference ?? booking.reference_code ?? booking.id,
+    name: booking.name,
+    phone_number: booking.phone_number ?? booking['phone number'] ?? '',
+    service: booking.service,
+    date: booking.date,
+    appointment_time: booking.appointment_time ?? booking['appointment time'] ?? '',
+    status: booking.status ?? 'scheduled',
+    notes: booking.notes,
+  }
 }
 
 async function readJsonResponse<T>(response: Response): Promise<T> {
@@ -149,19 +187,12 @@ export async function fetchBookingsFromBackend(date: string): Promise<BookingRec
 
   const bookings = await readJsonResponse<BackendBookingRecord[]>(response)
 
-  return bookings.map((booking) => ({
-    name: booking.name,
-    phone_number: booking.phone_number ?? booking['phone number'] ?? '',
-    service: booking.service,
-    date: booking.date,
-    appointment_time: booking.appointment_time ?? booking['appointment time'] ?? '',
-    notes: booking.notes,
-  }))
+  return bookings.map(normalizeBookingRecord)
 }
 
 export async function saveBookingToBackend(
   requestData: SaveBookingRequest,
-): Promise<unknown> {
+): Promise<SaveBookingResponse> {
   const response = await fetch(`${SCHEDULE_API_BASE_URL}/booking/save`, {
     method: 'POST',
     headers: {
@@ -170,5 +201,65 @@ export async function saveBookingToBackend(
     body: JSON.stringify(requestData),
   })
 
-  return readJsonResponse<unknown>(response)
+  return readJsonResponse<SaveBookingResponse>(response)
+}
+
+export async function trackBookingFromBackend(
+  requestData: TrackBookingRequest,
+): Promise<BookingRecord> {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/booking/track`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestData),
+  })
+
+  const booking = await readJsonResponse<BackendBookingRecord>(response)
+
+  return normalizeBookingRecord(booking)
+}
+
+export async function cancelBookingFromBackend(
+  requestData: TrackBookingRequest,
+): Promise<BookingRecord | { message: string }> {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/booking/cancel`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestData),
+  })
+
+  const data = await readJsonResponse<BackendBookingRecord | { message: string }>(response)
+  return 'message' in data ? data : normalizeBookingRecord(data)
+}
+
+export async function updateBookingStatusInBackend(
+  requestData: UpdateBookingStatusRequest,
+): Promise<BookingRecord | { message: string }> {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/booking/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestData),
+  })
+
+  const data = await readJsonResponse<BackendBookingRecord | { message: string }>(response)
+  return 'message' in data ? data : normalizeBookingRecord(data)
+}
+
+export async function deleteBookingInBackend(bookingReference: string): Promise<{ deleted?: boolean; message?: string }> {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/booking/delete`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      booking_reference: bookingReference,
+    }),
+  })
+
+  return readJsonResponse<{ deleted?: boolean; message?: string }>(response)
 }
