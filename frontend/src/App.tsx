@@ -11,6 +11,7 @@ import { Button, Reveal, SectionTitle } from './components/ui'
 import { ScheduleProvider } from './context/ScheduleContext'
 import { clinic, faqs, images, navLinks, pricing, testimonials, treatments, whatsappUrl } from './data/clinic'
 import BookingPage from './pages/BookingPage'
+import BookingConfirmationPage from './pages/BookingConfirmationPage'
 import BookingStatusPage from './pages/BookingStatusPage'
 import EmployeeAdminPage from './pages/EmployeeAdminPage'
 
@@ -449,6 +450,14 @@ export default function App() {
       <ScheduleProvider>
         <BookingStatusPage />
         <Chatbot />
+      </ScheduleProvider>
+    )
+  }
+
+  if (route === '/booking-confirmation') {
+    return (
+      <ScheduleProvider>
+        <BookingConfirmationPage />
       </ScheduleProvider>
     )
   }

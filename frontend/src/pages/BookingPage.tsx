@@ -6,6 +6,7 @@ import { clinic, treatments } from '../data/clinic'
 import { useSchedule } from '../context/ScheduleContext'
 import { loadPublicBookingSlotsFromBackend, saveBookingToBackend } from '../utils/scheduleApi'
 import { getEgyptDateInputValue } from '../utils/date'
+import { createBookingConfirmationData, saveBookingConfirmation } from '../utils/bookingConfirmation'
 
 const today = getEgyptDateInputValue()
 
@@ -69,23 +70,27 @@ export default function BookingPage() {
     setSubmissionNotice(null)
 
     try {
-      const savedBooking = await saveBookingToBackend({
+      const bookingRequest = {
         name: String(formData.get('name') ?? ''),
         phone_number: String(formData.get('phone_number') ?? ''),
         service: String(formData.get('service') ?? ''),
         date: selectedDate,
         appointment_time: selectedSlot,
         notes: String(formData.get('notes') ?? ''),
-      })
+      }
+
+      const savedBooking = await saveBookingToBackend(bookingRequest)
 
       updateSlotStatus(selectedDate, selectedSlot, 'booked')
-      const bookingReference = savedBooking.booking_reference ?? savedBooking.reference_code
-      setSubmissionNotice({
-        tone: 'success',
-        text: bookingReference
-          ? `Appointment request saved. Your reference is ${bookingReference}.`
-          : 'Appointment request saved.',
-      })
+      const confirmationData = createBookingConfirmationData(bookingRequest, savedBooking)
+
+      if (confirmationData) {
+        saveBookingConfirmation(confirmationData)
+        window.location.href = '/booking-confirmation'
+        return
+      }
+
+      setSubmissionNotice({ tone: 'success', text: 'Appointment request saved.' })
       setSelectedSlot('')
       form.reset()
     } catch (error) {

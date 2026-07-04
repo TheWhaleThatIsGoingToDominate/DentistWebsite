@@ -67,8 +67,19 @@ export type SaveBookingRequest = BookingRecord
 
 export type SaveBookingResponse = {
   saved?: boolean
+  booking?: {
+    name?: string
+    phone?: string
+    phone_number?: string
+    service?: string
+    date?: string
+    appointment_time?: string
+    booking_code?: string
+    booking_reference?: string
+  }
   booking_reference?: string
   reference_code?: string
+  confirmation_token?: string
   message?: string
 }
 
