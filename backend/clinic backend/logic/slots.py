@@ -84,7 +84,7 @@ def change_status(key: dict):
     if key["status"] == "available":
         key["status"] = "blocked"
     elif key["status"] == "booked":
-        return {"mesasge": "This slot is already booked and cannot be changed."}
+        return {"message": "This slot is already booked and cannot be changed."}
         #notify the admin that they cannot change this slot cause it is booked
     else:
         key["status"] = "available"
