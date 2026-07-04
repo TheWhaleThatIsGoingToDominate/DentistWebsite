@@ -8,7 +8,12 @@ export default function BookingConfirmationPage() {
   const [hasSavedCode, setHasSavedCode] = useState(false)
 
   useEffect(() => {
-    setConfirmationData(loadBookingConfirmation())
+    const storedConfirmation = loadBookingConfirmation()
+    setConfirmationData(storedConfirmation)
+
+    if (storedConfirmation) {
+      clearBookingConfirmation()
+    }
   }, [])
 
   if (!confirmationData) {
@@ -37,7 +42,6 @@ export default function BookingConfirmationPage() {
 
   const handleSavedCode = () => {
     setHasSavedCode(true)
-    clearBookingConfirmation()
   }
 
   return (
