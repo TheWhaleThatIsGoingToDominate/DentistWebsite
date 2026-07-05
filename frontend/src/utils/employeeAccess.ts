@@ -1,22 +1,23 @@
-// TODO: Replace this mock function with a backend API call.
-// Future backend should verify the key securely.
+export type EmployeeLoginCredentials = {
+  username: string
+  phone_number: string
+  password: string
+}
 
-export async function checkEmployeeAccessKey(accessKey: string) {
-  const response = await fetch("https://clinic-auth.vercel.app/employee/auth", {
-    method: "POST",
+export async function checkEmployeeAccessKey(credentials: EmployeeLoginCredentials) {
+  const response = await fetch('https://clinic-auth.vercel.app/employee/auth', {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      access_key: accessKey,
-    }),
-  });
+    body: JSON.stringify(credentials),
+  })
 
   if (!response.ok) {
-    return false;
+    return false
   }
 
-  const data = await response.json();
-  return data.allowed === true;
+  const data = await response.json()
+  return data.allowed === true
 }
 

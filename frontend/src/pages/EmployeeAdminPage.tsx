@@ -92,7 +92,9 @@ function generateSlots(startTime: string, endTime: string, slotLength: number): 
 export default function EmployeeAdminPage() {
   const { getSlotsForDate, setSlotsForDate, updateSlotForDate, updateSlotStatus } = useSchedule()
   const [hasAccess, setHasAccess] = useState(false)
-  const [accessKey, setAccessKey] = useState('')
+  const [username, setUsername] = useState('')
+  const [employeePhoneNumber, setEmployeePhoneNumber] = useState('')
+  const [employeePassword, setEmployeePassword] = useState('')
   const [accessError, setAccessError] = useState('')
   const [selectedDate, setSelectedDate] = useState(today)
   const [startTime, setStartTime] = useState('09:00 AM')
@@ -191,11 +193,20 @@ export default function EmployeeAdminPage() {
   const handleAccessSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    const allowed = await checkEmployeeAccessKey(accessKey)
-    //mockup function for verification
-    //was able to make a backend function
+    if (/\s/.test(username)) {
+      setAccessError('Username cannot contain spaces')
+      setHasAccess(false)
+      return
+    }
+
+    const allowed = await checkEmployeeAccessKey({
+      username,
+      phone_number: employeePhoneNumber,
+      password: employeePassword,
+    })
+
     if (!allowed) {
-      setAccessError('Invalid access key')
+      setAccessError('Invalid employee login')
       setHasAccess(false)
       return
     }
@@ -331,18 +342,49 @@ export default function EmployeeAdminPage() {
             <LockKeyhole className="h-5 w-5" />
           </span>
           <h1 className="mt-6 font-display text-4xl text-ink">Employee access</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-500">Enter the reception access key to manage demo appointment slots.</p>
+          <p className="mt-3 text-sm leading-6 text-slate-500">Enter your employee details to manage appointment slots and bookings.</p>
           <label className="form-label mt-7">
-            Access key
+            Username
+            <input
+              className="form-input"
+              type="text"
+              value={username}
+              onChange={(event) => {
+                setUsername(event.target.value.replace(/\s/g, ''))
+                setAccessError('')
+              }}
+              placeholder="employeeusername"
+              autoComplete="username"
+              required
+            />
+          </label>
+          <label className="form-label mt-4">
+            Phone number
+            <input
+              className="form-input"
+              type="tel"
+              value={employeePhoneNumber}
+              onChange={(event) => {
+                setEmployeePhoneNumber(event.target.value)
+                setAccessError('')
+              }}
+              placeholder="+20..."
+              autoComplete="tel"
+              required
+            />
+          </label>
+          <label className="form-label mt-4">
+            Password
             <input
               className="form-input"
               type="password"
-              value={accessKey}
+              value={employeePassword}
               onChange={(event) => {
-                setAccessKey(event.target.value)
+                setEmployeePassword(event.target.value)
                 setAccessError('')
               }}
-              placeholder="Enter access key"
+              placeholder="Enter password"
+              autoComplete="current-password"
               required
             />
           </label>
