@@ -151,11 +151,7 @@ def username_and_phonenumber_verifier(username: str, phone_number: str): #helper
             detail="BAD REQUEST: invalid phone number"
         )
     
-    return {
-    "username_format_valid": True,
-    "phone_number_format_valid": True,
-    "matched_employee": True
-    }
+
 
     employee = (
     supabase.table("employees")
@@ -188,11 +184,7 @@ def detail_verification(username: str, phone_number:str): #independent
     else:
         return response
 
-    return {
-    "username_format_valid": True,
-    "phone_number_format_valid": True,
-    "matched_employee": True
-    }  
+
 
     employee = (
     supabase.table("employees")
