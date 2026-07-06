@@ -105,18 +105,7 @@ def password_verifier(thePassword: str, username: str, phone_number: str):
 
     calculated_password = hashlib.pbkdf2_hmac("sha256", str(thePassword).encode(), saved_salt, 100000)
     return calculated_password == saved_hashed_password
-    # if calculated_password == saved_hashed_password:
-    #     # (
-    #     # supabase.table("employees")
-    #     # .update({"password_hash":saved_hashed_password.hex()})
-    #     # .update({"salt":salt.hex()})
-    #     # )
-    #     return {"message":"access allowed"}
-    # else:
-    #     raise HTTPException(
-    #         status_code=404,
-    #         detail="access denied"
-    #     )
+    
 
 
 
@@ -187,10 +176,10 @@ def detail_verification(username: str, phone_number:str): #independent
     }
 
     if not " " in username.strip():
-        username_format_valid = True
+        response["username_format_valid"] = True
 
     if phone_number.startswith("01") and len(phone_number) == 11 and phone_number.isdigit():
-        phone_number_format_valid = True
+        response["phone_number_format_valid"] = True
     else:
         return response
 
@@ -205,7 +194,7 @@ def detail_verification(username: str, phone_number:str): #independent
 )
 
     if employee:
-        matched_employee = True
+        response["matched_employee"] = True
     
     return response
 
@@ -231,3 +220,19 @@ def auth(username, phone_number, password):
             )
         #this executes when the username and number are legit, we hash the password with the old salt, and then compare
 
+
+
+
+#older instance of comparing the saved hashed password and the entered password that was hashed
+# if calculated_password == saved_hashed_password:
+    #     # (
+    #     # supabase.table("employees")
+    #     # .update({"password_hash":saved_hashed_password.hex()})
+    #     # .update({"salt":salt.hex()})
+    #     # )
+    #     return {"message":"access allowed"}
+    # else:
+    #     raise HTTPException(
+    #         status_code=404,
+    #         detail="access denied"
+    #     )
