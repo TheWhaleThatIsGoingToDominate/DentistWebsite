@@ -557,7 +557,7 @@ export default function EmployeeAdminPage() {
               type="password"
               value={employeePassword}
               onChange={(event) => {
-                setEmployeePassword(event.target.value)
+                setEmployeePassword(event.target.value.replace(/\s/g, ''))
                 setAccessError('')
               }}
               placeholder="Enter password"
