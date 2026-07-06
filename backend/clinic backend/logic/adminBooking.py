@@ -3,7 +3,7 @@ from fastapi import HTTPException
 def load_booking(date: str): #admin page
     return (
         supabase.table("bookingInfo")
-        .select("name", "phone_number", "service", "date", "appointment_time", "notes", "booking_reference", "status")
+        .select("*")
         .eq("date", date)
         .execute()
         .data
@@ -51,7 +51,7 @@ def change_status_of_booking(status: str ,booking_reference):
             .eq("date", date)
             .execute()
         )
-    elif status == "cancelled":
+    elif status == "cancelled": 
         (
             supabase.table("savingTheSlots")
             .update({"status":"available"})

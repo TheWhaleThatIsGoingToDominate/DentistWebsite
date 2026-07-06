@@ -1,7 +1,7 @@
 #imports
 import os
 from fastapi import FastAPI, HTTPException, status, Header
-from logic.authentication import Authentication
+from logic.authentication import detail_verification, auth
 from logic.slots import change_status, generate_slots, slots_cleanup, save_slots, load_booking_PBOOKINGPAGE, load_slotsADMINPAGE
 from logic.clientBooking import save_booking, track_booking, cancel_booking
 from logic.adminBooking import load_booking, delete_booking, change_status_of_booking
@@ -38,19 +38,38 @@ app.add_middleware(
 
 #authentication (right now it is just a simple code, we need to make a more secure system)
 class Verification(BaseModel):
-    access_key: str
+    username: str
+    phone_number: str
+
+#encryption (better version)
+@app.post("/employee/verify-details")
+def verify(data: Verification):
+    try:
+        return detail_verification(data.username, data.phone_number)
+    except HTTPException: 
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"SERVER ERROR: {str(e)}"
+        )
+
+class Authentication(BaseModel):
+    username: str
+    phone_number: str
+    password: str
 @app.post("/employee/auth")
-def auth(verification: Verification):
-    response = Authentication(verification.access_key)
-    if response == True:
-        return {
-            "allowed":response
-        } #send message in json confirming it is true
-    return {
-        "allowed":response
-    }
-        #send message in json confirming it is false
-@app.get("/runningCheck")
+def authentication(data: Authentication):
+    try:
+        return auth(data.username, data.phone_number, data.password)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail= f"SERVER ERROR: {str(e)}"
+        )
+@app.get("/isRunning")
 def running():
     return {
         "message":"the clinic backend is running"
@@ -269,6 +288,14 @@ def loadtheslots(date: str):
 
 
     
+
+
+
+
+
+
+
+
 
 # yo, important thing here, if you want to make the thing run again,
 # using vercel, you have to make the logic in a sperate folder, the 
