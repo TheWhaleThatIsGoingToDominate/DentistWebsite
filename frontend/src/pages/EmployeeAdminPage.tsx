@@ -1,7 +1,11 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { LockKeyhole, RefreshCw, Save } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Loader2, LockKeyhole, RefreshCw, Save } from 'lucide-react'
 import { AppointmentSlot, useSchedule } from '../context/ScheduleContext'
-import { checkEmployeeAccessKey } from '../utils/employeeAccess'
+import {
+  EmployeeIdentityVerificationResponse,
+  checkEmployeeAccessKey,
+  verifyEmployeeIdentity,
+} from '../utils/employeeAccess'
 import {
   BookingRecord,
   BookingStatus,
@@ -19,6 +23,7 @@ import { getEgyptDateInputValue } from '../utils/date'
 const today = getEgyptDateInputValue()
 
 type AdminSection = 'slots' | 'bookings'
+type PasswordVerificationStatus = 'idle' | 'checking' | 'verified' | 'incorrect' | 'error'
 
 const bookingStatuses: BookingStatus[] = ['scheduled', 'completed', 'cancelled', 'no_show']
 
@@ -27,6 +32,35 @@ const bookingStatusLabels: Record<BookingStatus, string> = {
   completed: 'Completed',
   cancelled: 'Cancelled',
   no_show: 'No-show',
+}
+
+const employeePhonePattern = /^01\d{9}$/
+
+function FieldStatus({
+  tone,
+  message,
+  isLoading = false,
+}: {
+  tone: 'success' | 'error' | 'neutral'
+  message: string
+  isLoading?: boolean
+}) {
+  const toneClasses = {
+    success: 'text-teal-700',
+    error: 'text-red-700',
+    neutral: 'text-slate-500',
+  }
+  const Icon = isLoading ? Loader2 : tone === 'success' ? CheckCircle2 : AlertCircle
+
+  return (
+    <p
+      role={tone === 'error' ? 'alert' : 'status'}
+      className={`mt-2 flex items-start gap-2 text-xs font-bold leading-5 ${toneClasses[tone]}`}
+    >
+      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${isLoading ? 'animate-spin' : ''}`} />
+      <span>{message}</span>
+    </p>
+  )
 }
 
 function timeToMinutes(time: string) {
@@ -96,6 +130,10 @@ export default function EmployeeAdminPage() {
   const [employeePhoneNumber, setEmployeePhoneNumber] = useState('')
   const [employeePassword, setEmployeePassword] = useState('')
   const [accessError, setAccessError] = useState('')
+  const [identityVerification, setIdentityVerification] = useState<EmployeeIdentityVerificationResponse | null>(null)
+  const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false)
+  const [identityVerificationError, setIdentityVerificationError] = useState('')
+  const [passwordVerificationStatus, setPasswordVerificationStatus] = useState<PasswordVerificationStatus>('idle')
   const [selectedDate, setSelectedDate] = useState(today)
   const [startTime, setStartTime] = useState('09:00 AM')
   const [endTime, setEndTime] = useState('05:00 PM')
@@ -117,6 +155,25 @@ export default function EmployeeAdminPage() {
   const [updatingBookingReference, setUpdatingBookingReference] = useState('')
 
   const slots = getSlotsForDate(selectedDate)
+  const trimmedUsername = username.trim()
+  const trimmedPhoneNumber = employeePhoneNumber.trim()
+  const isPhoneFormatValid = employeePhonePattern.test(trimmedPhoneNumber)
+  const isBothIdentityMissing =
+    identityVerification !== null &&
+    !identityVerification.usernameExists &&
+    !identityVerification.phoneExists
+  const isIdentityMismatch =
+    identityVerification !== null &&
+    identityVerification.usernameExists &&
+    identityVerification.phoneExists &&
+    !identityVerification.matchedEmployee
+  const isIdentityVerified =
+    identityVerification?.usernameExists === true &&
+    isPhoneFormatValid &&
+    identityVerification.phoneExists === true &&
+    identityVerification.matchedEmployee === true &&
+    !identityVerificationError
+  const isPasswordVerified = passwordVerificationStatus === 'verified'
 
   const filteredBookings = useMemo(() => {
     const normalizedSearch = bookingSearch.trim().toLowerCase()
@@ -190,6 +247,91 @@ export default function EmployeeAdminPage() {
     }
   }, [activeSection, hasAccess, loadBookings])
 
+  useEffect(() => {
+    setEmployeePassword('')
+    setPasswordVerificationStatus('idle')
+    setAccessError('')
+  }, [trimmedPhoneNumber, trimmedUsername])
+
+  useEffect(() => {
+    if (hasAccess) {
+      return
+    }
+
+    setIdentityVerificationError('')
+
+    if (!trimmedUsername && !trimmedPhoneNumber) {
+      setIdentityVerification(null)
+      setIsVerifyingIdentity(false)
+      return
+    }
+
+    let ignoreResponse = false
+    setIsVerifyingIdentity(true)
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const verification = await verifyEmployeeIdentity({
+          username: trimmedUsername,
+          phone_number: trimmedPhoneNumber,
+        })
+
+        if (!ignoreResponse) {
+          setIdentityVerification(verification)
+        }
+      } catch {
+        if (!ignoreResponse) {
+          setIdentityVerification(null)
+          setIdentityVerificationError('Unable to verify details right now. Please try again.')
+        }
+      } finally {
+        if (!ignoreResponse) {
+          setIsVerifyingIdentity(false)
+        }
+      }
+    }, 400)
+
+    return () => {
+      ignoreResponse = true
+      window.clearTimeout(timeoutId)
+    }
+  }, [hasAccess, trimmedPhoneNumber, trimmedUsername])
+
+  useEffect(() => {
+    if (hasAccess || !isIdentityVerified || !employeePassword) {
+      if (!employeePassword) {
+        setPasswordVerificationStatus('idle')
+      }
+      return
+    }
+
+    let ignoreResponse = false
+    setPasswordVerificationStatus('checking')
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const allowed = await checkEmployeeAccessKey({
+          username: trimmedUsername,
+          phone_number: trimmedPhoneNumber,
+          password: employeePassword,
+        })
+
+        if (!ignoreResponse) {
+          setPasswordVerificationStatus(allowed ? 'verified' : 'incorrect')
+        }
+      } catch {
+        if (!ignoreResponse) {
+          setPasswordVerificationStatus('error')
+        }
+      }
+    }, 400)
+
+    return () => {
+      ignoreResponse = true
+      window.clearTimeout(timeoutId)
+    }
+  }, [employeePassword, hasAccess, isIdentityVerified, trimmedPhoneNumber, trimmedUsername])
+
   const handleAccessSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -199,9 +341,15 @@ export default function EmployeeAdminPage() {
       return
     }
 
+    if (!isIdentityVerified || !isPasswordVerified) {
+      setAccessError('Complete employee verification before entering.')
+      setHasAccess(false)
+      return
+    }
+
     const allowed = await checkEmployeeAccessKey({
-      username,
-      phone_number: employeePhoneNumber,
+      username: trimmedUsername,
+      phone_number: trimmedPhoneNumber,
       password: employeePassword,
     })
 
@@ -357,6 +505,15 @@ export default function EmployeeAdminPage() {
               autoComplete="username"
               required
             />
+            {trimmedUsername && isVerifyingIdentity && (
+              <FieldStatus tone="neutral" message="Checking username..." isLoading />
+            )}
+            {trimmedUsername && !isVerifyingIdentity && identityVerification?.usernameExists === true && (
+              <FieldStatus tone="success" message="Username found in database" />
+            )}
+            {trimmedUsername && !isVerifyingIdentity && identityVerification?.usernameExists === false && (
+              <FieldStatus tone="error" message="Username is incorrect or not registered" />
+            )}
           </label>
           <label className="form-label mt-4">
             Phone number
@@ -372,7 +529,34 @@ export default function EmployeeAdminPage() {
               autoComplete="tel"
               required
             />
+            {trimmedPhoneNumber && !isPhoneFormatValid && (
+              <FieldStatus tone="error" message="Phone number is invalid. It must start with 01 and be exactly 11 digits" />
+            )}
+            {trimmedPhoneNumber && isPhoneFormatValid && isVerifyingIdentity && (
+              <FieldStatus tone="neutral" message="Checking phone number..." isLoading />
+            )}
+            {trimmedPhoneNumber && isPhoneFormatValid && !isVerifyingIdentity && identityVerification?.phoneExists === true && (
+              <FieldStatus tone="success" message="Phone number found in database" />
+            )}
+            {trimmedPhoneNumber && isPhoneFormatValid && !isVerifyingIdentity && identityVerification?.phoneExists === false && (
+              <FieldStatus tone="error" message="Phone number is incorrect or not registered" />
+            )}
           </label>
+          {identityVerificationError && (
+            <p role="alert" className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              {identityVerificationError}
+            </p>
+          )}
+          {isBothIdentityMissing && (
+            <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-800">
+              This username and phone number are not registered. This may be an unauthorized access attempt.
+            </p>
+          )}
+          {isIdentityMismatch && (
+            <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-800">
+              Username and phone number do not match the same employee record
+            </p>
+          )}
           <label className="form-label mt-4">
             Password
             <input
@@ -385,10 +569,30 @@ export default function EmployeeAdminPage() {
               }}
               placeholder="Enter password"
               autoComplete="current-password"
+              disabled={!isIdentityVerified}
               required
             />
+            {!isIdentityVerified && (
+              <FieldStatus tone="neutral" message="Password unlocks after username and phone number are verified." />
+            )}
+            {isIdentityVerified && passwordVerificationStatus === 'checking' && (
+              <FieldStatus tone="neutral" message="Checking password..." isLoading />
+            )}
+            {isIdentityVerified && passwordVerificationStatus === 'verified' && (
+              <FieldStatus tone="success" message="Password verified" />
+            )}
+            {isIdentityVerified && passwordVerificationStatus === 'incorrect' && (
+              <FieldStatus tone="error" message="Password is incorrect" />
+            )}
+            {isIdentityVerified && passwordVerificationStatus === 'error' && (
+              <FieldStatus tone="error" message="Unable to verify details right now. Please try again." />
+            )}
           </label>
-          <button type="submit" className="mt-5 min-h-12 w-full rounded-full bg-ink px-6 text-sm font-bold text-white transition hover:bg-teal-700">
+          <button
+            type="submit"
+            disabled={!isIdentityVerified || !isPasswordVerified}
+            className="mt-5 min-h-12 w-full rounded-full bg-ink px-6 text-sm font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Enter
           </button>
           {accessError && (
