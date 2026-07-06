@@ -10,9 +10,8 @@ export type EmployeeIdentityVerificationRequest = {
 }
 
 export type EmployeeIdentityVerificationResponse = {
-  username_exists: boolean
+  username_format_valid: boolean
   phone_number_format_valid: boolean
-  phone_number_exists: boolean
   matched_employee: boolean
 }
 

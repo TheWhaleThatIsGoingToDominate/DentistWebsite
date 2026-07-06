@@ -157,21 +157,16 @@ export default function EmployeeAdminPage() {
   const slots = getSlotsForDate(selectedDate)
   const trimmedUsername = username.trim()
   const trimmedPhoneNumber = employeePhoneNumber.trim()
+  const isUsernameFormatValid = trimmedUsername.length > 0 && !/\s/.test(trimmedUsername)
   const isPhoneFormatValid = employeePhonePattern.test(trimmedPhoneNumber)
-  const isBothIdentityMissing =
+  const isIdentityNotMatched =
     identityVerification !== null &&
-    !identityVerification.username_exists &&
-    !identityVerification.phone_number_exists
-  const isIdentityMismatch =
-    identityVerification !== null &&
-    identityVerification.username_exists &&
-    identityVerification.phone_number_exists &&
+    identityVerification.username_format_valid &&
+    identityVerification.phone_number_format_valid &&
     !identityVerification.matched_employee
   const isIdentityVerified =
-    identityVerification?.username_exists === true &&
-    isPhoneFormatValid &&
+    identityVerification?.username_format_valid === true &&
     identityVerification.phone_number_format_valid === true &&
-    identityVerification.phone_number_exists === true &&
     identityVerification.matched_employee === true &&
     !identityVerificationError
   const isPasswordVerified = passwordVerificationStatus === 'verified'
@@ -507,13 +502,13 @@ export default function EmployeeAdminPage() {
               required
             />
             {trimmedUsername && isVerifyingIdentity && (
-              <FieldStatus tone="neutral" message="Checking username..." isLoading />
+              <FieldStatus tone="neutral" message="Checking username format..." isLoading />
             )}
-            {trimmedUsername && !isVerifyingIdentity && identityVerification?.username_exists === true && (
-              <FieldStatus tone="success" message="Username found in database" />
+            {trimmedUsername && !isVerifyingIdentity && isUsernameFormatValid && (
+              <FieldStatus tone="success" message="Username format accepted" />
             )}
-            {trimmedUsername && !isVerifyingIdentity && identityVerification?.username_exists === false && (
-              <FieldStatus tone="error" message="Username is incorrect or not registered" />
+            {trimmedUsername && !isVerifyingIdentity && !isUsernameFormatValid && (
+              <FieldStatus tone="error" message="Username format is invalid" />
             )}
           </label>
           <label className="form-label mt-4">
@@ -534,13 +529,10 @@ export default function EmployeeAdminPage() {
               <FieldStatus tone="error" message="Phone number is invalid. It must start with 01 and be exactly 11 digits" />
             )}
             {trimmedPhoneNumber && isPhoneFormatValid && isVerifyingIdentity && (
-              <FieldStatus tone="neutral" message="Checking phone number..." isLoading />
+              <FieldStatus tone="neutral" message="Checking phone number format..." isLoading />
             )}
-            {trimmedPhoneNumber && isPhoneFormatValid && !isVerifyingIdentity && identityVerification?.phone_number_exists === true && (
-              <FieldStatus tone="success" message="Phone number found in database" />
-            )}
-            {trimmedPhoneNumber && isPhoneFormatValid && !isVerifyingIdentity && identityVerification?.phone_number_exists === false && (
-              <FieldStatus tone="error" message="Phone number is incorrect or not registered" />
+            {trimmedPhoneNumber && isPhoneFormatValid && !isVerifyingIdentity && identityVerification?.phone_number_format_valid === true && (
+              <FieldStatus tone="success" message="Phone number format accepted" />
             )}
           </label>
           {identityVerificationError && (
@@ -548,14 +540,14 @@ export default function EmployeeAdminPage() {
               {identityVerificationError}
             </p>
           )}
-          {isBothIdentityMissing && (
-            <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-800">
-              This username and phone number are not registered. This may be an unauthorized access attempt.
+          {isIdentityVerified && (
+            <p role="status" className="mt-4 rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm font-bold leading-6 text-teal-800">
+              Employee identity verified
             </p>
           )}
-          {isIdentityMismatch && (
+          {isIdentityNotMatched && (
             <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-800">
-              Username and phone number do not match the same employee record
+              Employee details do not match our records.
             </p>
           )}
           <label className="form-label mt-4">
