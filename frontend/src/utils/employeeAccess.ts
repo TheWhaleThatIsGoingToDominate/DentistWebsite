@@ -10,10 +10,10 @@ export type EmployeeIdentityVerificationRequest = {
 }
 
 export type EmployeeIdentityVerificationResponse = {
-  usernameExists: boolean
-  phoneFormatValid: boolean
-  phoneExists: boolean
-  matchedEmployee: boolean
+  username_exists: boolean
+  phone_number_format_valid: boolean
+  phone_number_exists: boolean
+  matched_employee: boolean
 }
 
 const EMPLOYEE_AUTH_BASE_URL = 'https://clinic-auth.vercel.app'

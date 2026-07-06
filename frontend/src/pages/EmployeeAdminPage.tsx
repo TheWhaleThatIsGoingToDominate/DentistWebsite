@@ -160,18 +160,19 @@ export default function EmployeeAdminPage() {
   const isPhoneFormatValid = employeePhonePattern.test(trimmedPhoneNumber)
   const isBothIdentityMissing =
     identityVerification !== null &&
-    !identityVerification.usernameExists &&
-    !identityVerification.phoneExists
+    !identityVerification.username_exists &&
+    !identityVerification.phone_number_exists
   const isIdentityMismatch =
     identityVerification !== null &&
-    identityVerification.usernameExists &&
-    identityVerification.phoneExists &&
-    !identityVerification.matchedEmployee
+    identityVerification.username_exists &&
+    identityVerification.phone_number_exists &&
+    !identityVerification.matched_employee
   const isIdentityVerified =
-    identityVerification?.usernameExists === true &&
+    identityVerification?.username_exists === true &&
     isPhoneFormatValid &&
-    identityVerification.phoneExists === true &&
-    identityVerification.matchedEmployee === true &&
+    identityVerification.phone_number_format_valid === true &&
+    identityVerification.phone_number_exists === true &&
+    identityVerification.matched_employee === true &&
     !identityVerificationError
   const isPasswordVerified = passwordVerificationStatus === 'verified'
 
@@ -508,10 +509,10 @@ export default function EmployeeAdminPage() {
             {trimmedUsername && isVerifyingIdentity && (
               <FieldStatus tone="neutral" message="Checking username..." isLoading />
             )}
-            {trimmedUsername && !isVerifyingIdentity && identityVerification?.usernameExists === true && (
+            {trimmedUsername && !isVerifyingIdentity && identityVerification?.username_exists === true && (
               <FieldStatus tone="success" message="Username found in database" />
             )}
-            {trimmedUsername && !isVerifyingIdentity && identityVerification?.usernameExists === false && (
+            {trimmedUsername && !isVerifyingIdentity && identityVerification?.username_exists === false && (
               <FieldStatus tone="error" message="Username is incorrect or not registered" />
             )}
           </label>
@@ -535,10 +536,10 @@ export default function EmployeeAdminPage() {
             {trimmedPhoneNumber && isPhoneFormatValid && isVerifyingIdentity && (
               <FieldStatus tone="neutral" message="Checking phone number..." isLoading />
             )}
-            {trimmedPhoneNumber && isPhoneFormatValid && !isVerifyingIdentity && identityVerification?.phoneExists === true && (
+            {trimmedPhoneNumber && isPhoneFormatValid && !isVerifyingIdentity && identityVerification?.phone_number_exists === true && (
               <FieldStatus tone="success" message="Phone number found in database" />
             )}
-            {trimmedPhoneNumber && isPhoneFormatValid && !isVerifyingIdentity && identityVerification?.phoneExists === false && (
+            {trimmedPhoneNumber && isPhoneFormatValid && !isVerifyingIdentity && identityVerification?.phone_number_exists === false && (
               <FieldStatus tone="error" message="Phone number is incorrect or not registered" />
             )}
           </label>
