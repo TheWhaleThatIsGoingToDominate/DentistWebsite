@@ -1,6 +1,7 @@
 import {
   Activity,
   AlertTriangle,
+  ArrowRight,
   BadgeCheck,
   BriefcaseBusiness,
   CalendarCheck,
@@ -537,8 +538,221 @@ function TeamPanel() {
   )
 }
 
+function OwnerEntryCard({
+  href,
+  eyebrow,
+  title,
+  text,
+  icon: Icon,
+  tone = 'light',
+}: {
+  href: string
+  eyebrow: string
+  title: string
+  text: string
+  icon: LucideIcon
+  tone?: 'light' | 'dark'
+}) {
+  const isDark = tone === 'dark'
+
+  return (
+    <a
+      href={href}
+      className={`group relative block w-full min-w-0 max-w-full overflow-hidden rounded-[1.5rem] p-6 shadow-card transition hover:-translate-y-0.5 ${
+        isDark ? 'bg-ink text-white' : 'border border-teal-100 bg-white text-ink'
+      }`}
+    >
+      <Icon className={`absolute -right-5 -top-5 h-28 w-28 ${isDark ? 'text-white/10' : 'text-teal-100'}`} />
+      <div className="relative">
+        <p className={`text-xs font-extrabold uppercase tracking-[0.18em] ${isDark ? 'text-gold-300' : 'text-teal-600'}`}>{eyebrow}</p>
+        <h2 className={`mt-3 break-words font-display text-3xl leading-tight ${isDark ? 'text-white' : 'text-ink'}`}>{title}</h2>
+        <p className={`mt-3 max-w-xl break-words text-sm leading-6 ${isDark ? 'text-white/65' : 'text-slate-500'}`}>{text}</p>
+        <span className={`mt-5 inline-flex items-center gap-2 text-sm font-bold ${isDark ? 'text-gold-300' : 'text-teal-700'}`}>
+          Open dashboard
+          <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+        </span>
+      </div>
+    </a>
+  )
+}
+
+function OwnerServiceCard({
+  title,
+  text,
+  meta,
+  items,
+  icon: Icon,
+  tone = 'standard',
+}: {
+  title: string
+  text?: string
+  meta?: string
+  items?: string[]
+  icon: LucideIcon
+  tone?: 'standard' | 'careful' | 'restricted'
+}) {
+  const toneStyles = {
+    standard: 'border-white/10 bg-white/8',
+    careful: 'border-gold-300/30 bg-gold-400/10',
+    restricted: 'border-red-200/20 bg-red-200/10',
+  }
+
+  return (
+    <article className={`relative w-full min-w-0 max-w-full overflow-hidden rounded-[1.5rem] border p-6 text-white shadow-card ${toneStyles[tone]}`}>
+      <Icon className="absolute -right-6 -top-6 h-32 w-32 text-white/10" />
+      <div className="relative">
+        {meta && <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-gold-300">{meta}</p>}
+        <h3 className="mt-2 font-display text-2xl leading-tight text-white">{title}</h3>
+        {text && <p className="mt-3 break-words text-sm leading-6 text-white/65">{text}</p>}
+        {items && (
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {items.map((item) => (
+              <div key={item} className="flex gap-3 rounded-xl bg-white/10 px-3 py-3 text-sm font-semibold leading-6 text-white/75">
+                <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-gold-300" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </article>
+  )
+}
+
+function OwnerServicesSection({ config }: { config: RoleConfig }) {
+  return (
+    <section id="your-services" className="mt-10 w-full max-w-full rounded-[2rem] bg-ink p-6 text-white shadow-soft sm:p-8 lg:p-10">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-[0.22em] text-gold-300">Collected workspace</p>
+          <h2 className="mt-3 font-display text-4xl leading-tight text-white sm:text-5xl">Your Services</h2>
+        </div>
+        <p className="max-w-xl text-sm leading-6 text-white/60">
+          Owner controls, clinic services, and sensitive actions are grouped here so the main workspace stays calm and focused.
+        </p>
+      </div>
+
+      <div className="mt-8 grid gap-4 md:grid-cols-3">
+        {config.metrics.map((item, index) => (
+          <OwnerServiceCard
+            key={item.title}
+            title={item.text}
+            text={item.meta}
+            meta={item.title}
+            icon={[CalendarCheck, UsersRound, ShieldCheck][index]}
+          />
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        {config.focusPanels.map((item, index) => (
+          <OwnerServiceCard
+            key={item.title}
+            title={item.title}
+            text={item.text}
+            meta={item.meta ?? `Service ${index + 1}`}
+            icon={[UserCog, ListChecks, CalendarDays, Stethoscope][index]}
+          />
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-5">
+        <OwnerServiceCard title={`${config.label} access included`} items={config.permissions} icon={ShieldCheck} />
+        <OwnerServiceCard title="Daily tools included" items={config.practicalPermissions} icon={ListChecks} />
+        {config.carefulActions && (
+          <OwnerServiceCard title="High-risk owner actions separated" items={config.carefulActions} icon={AlertTriangle} tone="careful" />
+        )}
+        <OwnerServiceCard title="Not shown by default" items={config.restricted} icon={LockKeyhole} tone="restricted" />
+      </div>
+    </section>
+  )
+}
+
+function OwnerDashboard({ config, token }: { config: RoleConfig; token: string }) {
+  const Icon = config.icon
+
+  return (
+    <main className="min-h-screen overflow-x-hidden bg-[#f5faf9]">
+      <aside className="border-b border-teal-100 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-col items-start gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-8">
+          <a href={withAccessQuery(token, config.role, 'overview')} className="flex items-center gap-3">
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-gold-300">
+              <PanelTop className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-bold tracking-[0.22em] text-ink">AURORA</p>
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.26em] text-teal-600">Clinic platform</p>
+            </div>
+          </a>
+          <a href="#your-services" className="shrink-0 rounded-full border border-teal-100 bg-white px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-ink transition hover:border-teal-300 hover:bg-teal-50">
+            Your Services
+          </a>
+        </div>
+      </aside>
+
+      <section className="mx-auto w-full max-w-7xl px-5 py-8 lg:px-8 lg:py-10">
+        <div className="w-full max-w-full rounded-[1.75rem] bg-white p-6 shadow-soft sm:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-ink text-gold-300">
+                  <Icon className="h-6 w-6" />
+                </span>
+                <Pill>{config.label}</Pill>
+                <Pill>{config.accent}</Pill>
+              </div>
+              <p className="mt-7 text-xs font-extrabold uppercase tracking-[0.24em] text-teal-600">{config.eyebrow}</p>
+              <h1 className="mt-3 max-w-4xl font-display text-4xl leading-[1.05] text-ink sm:text-6xl">Business command center</h1>
+              <p className="mt-5 max-w-3xl break-words leading-7 text-slate-600">{config.summary}</p>
+            </div>
+            <div className="w-full max-w-full rounded-2xl border border-teal-100 bg-[#f5faf9] p-4 lg:w-72">
+              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">Secure workspace</p>
+              <p className="mt-3 text-xs leading-5 text-slate-500">This view is prepared for the signed-in clinic owner.</p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">Sensitive actions stay grouped below for review.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <OwnerEntryCard
+            href="/employee-admin"
+            eyebrow="Employee dashboard"
+            title="Review a day's work in minutes."
+            text="See employees, review work, manage staff-related actions, and keep the clinic overview in one focused place."
+            icon={UserCog}
+            tone="dark"
+          />
+          <OwnerEntryCard
+            href={withAccessQuery(token, 'DOCTOR', 'doctor-services')}
+            eyebrow="Doctor mode"
+            title="All your needs, in one place."
+            text="Open doctor services, clinical documentation, treatment notes, and owner-doctor workflows without cluttering this page."
+            icon={Stethoscope}
+          />
+        </div>
+
+        <div className="mt-6">
+          <OwnerEntryCard
+            href="/employee-admin"
+            eyebrow="Today at a glance"
+            title="Review the clinic flow without fake previews."
+            text="Open the employee dashboard to inspect schedules, bookings, slot work, and daily operational activity."
+            icon={CalendarDays}
+          />
+        </div>
+
+        <OwnerServicesSection config={config} />
+      </section>
+    </main>
+  )
+}
+
 function RoleDashboard({ config, token }: { config: RoleConfig; token: string }) {
   const Icon = config.icon
+
+  if (config.role === 'OWNER') {
+    return <OwnerDashboard config={config} token={token} />
+  }
 
   return (
     <main className="min-h-screen bg-[#f5faf9]">
