@@ -14,6 +14,7 @@ import BookingPage from './pages/BookingPage'
 import BookingConfirmationPage from './pages/BookingConfirmationPage'
 import BookingStatusPage from './pages/BookingStatusPage'
 import EmployeeAdminPage from './pages/EmployeeAdminPage'
+import RoleDashboardPage from './pages/RoleDashboardPage'
 
 const treatmentIcons = { Sparkles, Sun, CircleDot, Gem, ShieldCheck, ScanLine }
 
@@ -466,6 +467,14 @@ export default function App() {
     return (
       <ScheduleProvider>
         <EmployeeAdminPage />
+      </ScheduleProvider>
+    )
+  }
+
+  if (route === '/role-dashboard') {
+    return (
+      <ScheduleProvider>
+        <RoleDashboardPage />
       </ScheduleProvider>
     )
   }
