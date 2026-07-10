@@ -5,9 +5,12 @@ export type EmployeeLoginCredentials = {
   tokenDuration: number
 }
 
+export type EmployeeRole = 'DOCTOR' | 'OWNER' | 'RECEPTIONIST' | 'MANAGER'
+
 export type EmployeeAuthenticationResponse = {
   allowed?: boolean
   token?: string
+  role?: EmployeeRole
 }
 
 export type EmployeeSession = {
@@ -15,6 +18,7 @@ export type EmployeeSession = {
   phone_number: string
   token: string
   tokenDuration: number
+  role: EmployeeRole
 }
 
 export type EmployeeIdentityVerificationRequest = {
@@ -49,8 +53,13 @@ function isEmployeeSession(value: unknown): value is EmployeeSession {
     typeof session.username === 'string' &&
     typeof session.phone_number === 'string' &&
     typeof session.token === 'string' &&
-    typeof session.tokenDuration === 'number'
+    typeof session.tokenDuration === 'number' &&
+    isEmployeeRole(session.role)
   )
+}
+
+export function isEmployeeRole(value: unknown): value is EmployeeRole {
+  return value === 'DOCTOR' || value === 'OWNER' || value === 'RECEPTIONIST' || value === 'MANAGER'
 }
 
 async function readEmployeeAuthResponse<T>(response: Response): Promise<T> {

@@ -7,6 +7,7 @@ import {
   checkEmployeeAccessKey,
   clearEmployeeSessionInBackend,
   clearStoredEmployeeSession,
+  isEmployeeRole,
   loadEmployeeSession,
   saveEmployeeSession,
   verifyEmployeeIdentity,
@@ -412,13 +413,26 @@ export default function EmployeeAdminPage() {
       return
     }
 
+    if (!isEmployeeRole(authentication.role)) {
+      setAccessError('Employee role is missing or unsupported.')
+      setHasAccess(false)
+      return
+    }
+
     saveEmployeeSession({
       username: trimmedUsername,
       phone_number: trimmedPhoneNumber,
       token: authentication.token,
       tokenDuration,
+      role: authentication.role,
     })
     setAccessError('')
+
+    // const dashboardParams = new URLSearchParams({
+    //   token: authentication.token,
+    //   role: authentication.role,
+    // })
+    // window.location.href = `/role-dashboard?${dashboardParams.toString()}`
     setHasAccess(true)
   }
 
