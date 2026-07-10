@@ -1,5 +1,5 @@
 from database.main import supabase
-from datetime import datetime, date
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 #loading slots, in the admin page and the public booking page

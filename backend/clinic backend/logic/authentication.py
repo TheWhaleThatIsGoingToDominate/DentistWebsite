@@ -154,15 +154,30 @@ def create_token(username: str, phone_number: str, valid_time: int): #helper fun
     return token, token_expiry_time.isoformat()
 
 def token_hash_verifier(hashed_token: str, token_salt: str, theToken: str): #helper function
-    theToken = str(theToken).encode()
-    hashed_token = bytes.fromhex(hashed_token)
-    token_salt = bytes.fromhex(token_salt)
-    calculated_hash = hashlib.pbkdf2_hmac("sha256", theToken, token_salt, 100000)
+    try:
+        theToken = str(theToken).encode()
+        hashed_token = bytes.fromhex(hashed_token)
+        token_salt = bytes.fromhex(token_salt)
+        calculated_hash = hashlib.pbkdf2_hmac("sha256", theToken, token_salt, 100000)
+    except Exception:
+        raise HTTPException(
+            status_code=401,
+            detail="unauthorized"
+        )
     
     return compare_digest(hashed_token, calculated_hash)
 
 
 def verify_employee_token(username: str, phone_number: str, token: str): #finding the token for the website
+    def clear_employee_token_fields(username: str, phone_number: str):
+        supabase.table("employees").update({
+            "hashed_token": None,
+            "token_salt": None,
+            "valid_time": None,
+            "token_creation_time": None,
+            "token_expiry_time": None,
+        }).eq("username", username).eq("phone_number", phone_number).execute() 
+    
     TheEmployee = (
         supabase.table("employees")
         .select("*")
@@ -181,27 +196,62 @@ def verify_employee_token(username: str, phone_number: str, token: str): #findin
     token_salt = employee.get("token_salt")
 
     if not hashed_token  or not token_salt:
+        clear_employee_token_fields(username, phone_number)
         raise HTTPException(
             status_code=401,
             detail="access denied"
         )
     
-    raw_time: str = employee["token_expiry_time"]
-    if raw_time.endswith("+00"):
-        raw_time = raw_time[:-3] + "+00:00"
-    token_expiry_time = datetime.fromisoformat(raw_time)
-    if token_expiry_time <= datetime.now(timezone.utc):
-        if delete_employee_token(username, phone_number, token) == {"success":True}:
+    raw_time: str = employee.get("token_expiry_time")
+    if not raw_time:
+        clear_employee_token_fields(username, phone_number)
+        raise HTTPException(status_code=401, detail="Token expired, access denied")
+
+    try:
+        if isinstance(raw_time, datetime):
+            token_expiry_time = raw_time
+            if token_expiry_time.tzinfo is None:
+                token_expiry_time = token_expiry_time.replace(tzinfo=timezone.utc)
+        elif isinstance(raw_time, str):
+            if raw_time.endswith("+00"):
+                raw_time = raw_time[:-3] + "+00:00"
+            if raw_time.endswith("Z"):
+                raw_time = raw_time[:-1] + "+00:00"
+            
+            token_expiry_time = datetime.fromisoformat(raw_time)
+                
+            if token_expiry_time.tzinfo is None:
+                token_expiry_time = token_expiry_time.replace(tzinfo=timezone.utc)
+        else:
+            clear_employee_token_fields(username, phone_number)
             raise HTTPException(
-                status_code=401,
-                detail="Token expired, access denied"
+                status_code= 401, 
+                detail="access denied"
             )
-    
-    if not token_hash_verifier(hashed_token, token_salt, token):
+    except Exception:
+        clear_employee_token_fields(username, phone_number)
+        raise HTTPException(
+            status_code= 401, 
+            detail="access denied"
+        )
+
+    if token_expiry_time <= datetime.now(timezone.utc):
+        clear_employee_token_fields(username, phone_number)
         raise HTTPException(
             status_code=401,
             detail="Token expired, access denied"
         )
+    
+    try:
+        if not token_hash_verifier(hashed_token, token_salt, token):
+            clear_employee_token_fields(username, phone_number)
+            raise HTTPException(
+                status_code=401,
+                detail="Token expired, access denied"
+            )
+    except HTTPException:
+        clear_employee_token_fields(username, phone_number)
+        raise
     
     return TheEmployee
 
@@ -223,11 +273,14 @@ def delete_employee_token(username: str, phone_number: str, token: str):
     
     if not hashed_token or not token_salt:
         return {"success":True}
-    if not token_hash_verifier(hashed_token, token_salt, token):
-        raise HTTPException(
-            status_code=401,
-            detail="unauthorized, invalid token"
-        )
+    try:
+        if not token_hash_verifier(hashed_token, token_salt, token):
+            raise HTTPException(
+                status_code=401,
+                detail="unauthorized, invalid token"
+            )
+    except HTTPException:
+        raise
     #updating of all token-related vars: var --(updated)--> ""
     
     (
