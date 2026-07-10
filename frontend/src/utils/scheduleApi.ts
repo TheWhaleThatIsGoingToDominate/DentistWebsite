@@ -52,7 +52,6 @@ export type BookingStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show'
 type BackendBookingRecord = {
   booking_reference?: string
   reference_code?: string
-  id?: string
   name: string
   'phone number'?: string
   phone_number?: string
@@ -121,7 +120,7 @@ function getEmployeeAdminHeaders(includeJson = false) {
 
 function normalizeBookingRecord(booking: BackendBookingRecord): BookingRecord {
   return {
-    booking_reference: booking.booking_reference ?? booking.reference_code ?? booking.id,
+    booking_reference: booking.booking_reference ?? booking.reference_code,
     name: booking.name,
     phone_number: booking.phone_number ?? booking['phone number'] ?? '',
     service: booking.service,
