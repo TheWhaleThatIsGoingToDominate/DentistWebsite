@@ -7,7 +7,7 @@ import os
 from cryptography.fernet import Fernet
 from database.main import supabase
 from fastapi import HTTPException
-
+from datetime import datetime, date
 #encryption and decryption
 def encryptor(txt:str):
     """
@@ -55,12 +55,11 @@ def decryptor(encrypted_txt: str): #the string provided is a hexadecimal
 
 #password hashing, ans password verification relative to name of employee
 import hashlib
+from hmac import compare_digest
 
-def create_new_hashed_password(thePassword: str): #will be used when creating a new account
+def create_new_hash_forpassword_or_token(thePassword: str): #will be used when creating a new account
     
     #hashing
-    # saved_salt = os.urandom(16)
-    
     saved_salt = os.urandom(16)
     hashed_password = hashlib.pbkdf2_hmac(
         password=str(thePassword).encode(),
@@ -103,8 +102,8 @@ def password_verifier(thePassword: str, username: str, phone_number: str):
         )
     saved_hashed_password = bytes.fromhex(str(saved_hashed_password[0]["password_hash"]))
 
-    calculated_password = hashlib.pbkdf2_hmac("sha256", str(thePassword).encode(), saved_salt, 100000)
-    return calculated_password == saved_hashed_password
+    calculated_password: bytes = hashlib.pbkdf2_hmac("sha256", str(thePassword).encode(), saved_salt, 100000)
+    return compare_digest(saved_hashed_password, calculated_password)
     
 
 
@@ -117,15 +116,135 @@ def password_verifier(thePassword: str, username: str, phone_number: str):
 
 
 #token maker for each visit on the employee admin page
+#token system
 import uuid
-def token_maker():
+from datetime import datetime, date, timedelta, timezone
+from zoneinfo import ZoneInfo
+def create_token(username: str, phone_number: str, valid_time: int): #helper function for auth
     """
     create a token for each visitor on the admin page.
     delete it once they exit from the page or refresh it.
+    steps: 
+    1. create token,
+    - make created_at time, calculate the expirey time
+    2. send token to frontend,                           < 
+    3. hash token, save it with its salt and valid time. < order of those steps doens't matter here
+    4. when the expirey time has finished (or when the login page is entered), you delete the hashed token, its salt, and the valid_time of it
     """
+    token = str(uuid.uuid4()) #create token
+    token_creation_time= datetime.now(ZoneInfo("Africa/cairo")) #gather the time where the token was created
+    token_expiry_time = token_creation_time + timedelta(minutes=valid_time)
+    hashed_token , token_salt = create_new_hash_forpassword_or_token(token) #hash token, obtain its salt
 
-    return str(uuid.uuid4())
+    #save hashed token to the database, along with its salt
+    (
+        supabase.table("employees")
+        .update({
+            "hashed_token":hashed_token,
+            "token_salt":token_salt,
+            "valid_time": valid_time,
+            "token_creation_time":token_creation_time, 
+            "token_expiry_time":token_expiry_time
+            })
+        .eq("username", username)
+        .eq("phone_number", phone_number)
+        .execute()
+    )
 
+    return token, token_expiry_time
+
+def token_hash_verifier(hashed_token: str, token_salt: str, theToken: str): #helper function
+    theToken = str(theToken).encode()
+    hashed_token = bytes.fromhex(hashed_token)
+    token_salt = bytes.fromhex(token_salt)
+    calculated_hash = hashlib.pbkdf2_hmac("sha256", theToken, token_salt, 100000)
+    
+    return compare_digest(hashed_token, calculated_hash)
+
+
+def verify_employee_token(username: str, phone_number: str, token: str): #finding the token for the website
+    TheEmployee = (
+        supabase.table("employees")
+        .select("*")
+        .eq("username", username)
+        .eq("phone_number", phone_number)
+        .execute()
+        .data
+    )
+    if not TheEmployee:
+        raise HTTPException(
+            status_code=401,
+            detail="access denied"
+        )
+    employee: dict =TheEmployee[0]
+    hashed_token = employee.get("hashed_token")
+    token_salt = employee.get("token_salt")
+
+    if not hashed_token  or not token_salt:
+        raise HTTPException(
+            status_code=401,
+            detail="access denied"
+        )
+    
+    raw_time: str = employee["token_expiry_time"]
+    if raw_time.endswith("+00"):
+        raw_time = raw_time[:-3] + "+00:00"
+    token_expiry_time = datetime.fromisoformat(raw_time)
+    if token_expiry_time <= datetime.now(timezone.utc):
+        if delete_employee_token(username, phone_number, token) == {"success":True}:
+            raise HTTPException(
+                status_code=401,
+                detail="Token expired, access denied"
+            )
+    
+    if not token_hash_verifier(hashed_token, token_salt, token):
+        raise HTTPException(
+            status_code=401,
+            detail="Token expired, access denied"
+        )
+    
+    return TheEmployee
+
+def delete_employee_token(username: str, phone_number: str, token: str):
+    #comparing hashed tokens
+    theToken = (
+        supabase.table("employees")
+        .select("hashed_token, token_salt")
+        .eq("username", username)
+        .eq("phone_number", phone_number)
+        .execute()
+        .data
+    )
+    if not theToken: #this means that there is not token to clear cause it's not there
+        return {"success":True}
+    
+    hashed_token = theToken[0]["hashed_token"]
+    token_salt = theToken[0]["token_salt"]
+    
+    if not hashed_token or not token_salt:
+        return {"success":True}
+    if not token_hash_verifier(hashed_token, token_salt, token):
+        raise HTTPException(
+            status_code=401,
+            detail="unauthorized, invalid token"
+        )
+    #updating of all token-related vars: var --(updated)--> ""
+    
+    (
+        supabase.table("employees")
+        .update({
+            "hashed_token":None,
+            "token_salt":None,
+            "valid_time":None,
+            "token_creation_time":None, 
+            "token_expiry_time":None
+            })
+        .eq("username", username)
+        .eq("phone_number", phone_number)
+        .execute()
+    )
+
+    return {"success":True}
 
 
 
@@ -206,7 +325,7 @@ def detail_verification(username: str, phone_number:str): #independent
 
 
 #the full function that takes all of that in one thing
-def auth(username, phone_number, password):
+def auth(username, phone_number, password, valid_time: int):
     if not username_and_phonenumber_verifier(username, phone_number):
         raise HTTPException(
             status_code=404,
@@ -214,7 +333,9 @@ def auth(username, phone_number, password):
         )
     else:
         if password_verifier(password, username, phone_number):
-            return {"allowed":True, "token":token_maker()}
+            token, token_expiry_time= create_token(username, phone_number, valid_time)
+            # TODO: MAKE TOKEN SYSTEM
+            return {"allowed":True, "token":token, "expires_at":token_expiry_time}
         else:
             raise HTTPException(
                 status_code=401,

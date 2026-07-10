@@ -7,7 +7,6 @@ from logic.slots import update_status
 import secrets
 import string
 
-
 def save_booking(name: str, phone_number, service, date, appointment_time, notes=None): #public booking
     #confirming the name and the phone number to be legitimate
     for subname in name.split():

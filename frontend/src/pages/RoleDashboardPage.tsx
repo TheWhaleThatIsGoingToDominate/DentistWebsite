@@ -1,15 +1,12 @@
 import {
-  Activity,
   AlertTriangle,
   ArrowRight,
   BadgeCheck,
   BriefcaseBusiness,
   CalendarCheck,
   CalendarDays,
-  FileText,
   ListChecks,
   LockKeyhole,
-  MessageSquareText,
   PanelTop,
   ShieldCheck,
   Sparkles,
@@ -319,18 +316,6 @@ const ROLE_CONFIG: Record<SupportedRole, RoleConfig> = {
   },
 }
 
-const sampleAppointments = [
-  { time: '09:00 AM', patient: 'Mariam Hassan', service: 'Composite restoration', status: 'In clinic' },
-  { time: '10:30 AM', patient: 'Omar Adel', service: 'Consultation', status: 'Confirmed' },
-  { time: '12:00 PM', patient: 'Nour Samir', service: 'Scaling', status: 'Documentation pending' },
-]
-
-const sampleTeam = [
-  { name: 'Dr. Adam Karim', role: 'Doctor', state: 'Treating patients' },
-  { name: 'Salma Nabil', role: 'Receptionist', state: 'Front desk' },
-  { name: 'Youssef Ali', role: 'Manager', state: 'Operations' },
-]
-
 function getRoleFromQuery(value: string | null): SupportedRole | null {
   if (!value) {
     return null
@@ -343,6 +328,15 @@ function getRoleFromQuery(value: string | null): SupportedRole | null {
 function withAccessQuery(token: string, role: SupportedRole, section: string) {
   const params = new URLSearchParams({ token, role, section })
   return `/role-dashboard?${params.toString()}`
+}
+
+function slugify(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+}
+
+function withPlaceholderRoute(token: string, role: SupportedRole, option: string) {
+  const params = new URLSearchParams({ token })
+  return `/role-dashboard/${role.toLowerCase()}/${slugify(option)}?${params.toString()}`
 }
 
 function AccessState({
@@ -382,162 +376,6 @@ function Pill({ children }: { children: string }) {
   )
 }
 
-function MetricCard({ item }: { item: DashboardItem }) {
-  return (
-    <article className="rounded-[1.25rem] border border-teal-100 bg-white p-5 shadow-card">
-      <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-teal-600">{item.title}</p>
-      <p className="mt-3 font-display text-3xl text-ink">{item.text}</p>
-      {item.meta && <p className="mt-2 text-xs font-semibold text-slate-500">{item.meta}</p>}
-    </article>
-  )
-}
-
-function FocusCard({ item, index }: { item: DashboardItem; index: number }) {
-  return (
-    <article className="group rounded-[1.25rem] border border-slate-100 bg-white p-5 shadow-card transition hover:-translate-y-0.5 hover:border-teal-200">
-      <div className="flex items-center justify-between gap-4">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-teal-50 text-sm font-extrabold text-teal-700">
-          0{index + 1}
-        </span>
-        {item.meta && <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">{item.meta}</span>}
-      </div>
-      <h3 className="mt-5 font-display text-2xl text-ink">{item.title}</h3>
-      <p className="mt-3 text-sm leading-6 text-slate-500">{item.text}</p>
-    </article>
-  )
-}
-
-function ListPanel({
-  title,
-  items,
-  icon: Icon,
-  tone = 'standard',
-}: {
-  title: string
-  items: string[]
-  icon: LucideIcon
-  tone?: 'standard' | 'careful' | 'restricted'
-}) {
-  const styles = {
-    standard: 'border-teal-100 bg-white',
-    careful: 'border-gold-200 bg-gold-50',
-    restricted: 'border-red-100 bg-red-50',
-  }
-
-  return (
-    <section className={`rounded-[1.5rem] border p-6 shadow-card ${styles[tone]}`}>
-      <div className="flex items-center gap-3">
-        <span className="grid h-11 w-11 place-items-center rounded-xl bg-ink text-gold-300">
-          <Icon className="h-5 w-5" />
-        </span>
-        <h2 className="font-display text-2xl text-ink">{title}</h2>
-      </div>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        {items.map((item) => (
-          <div key={item} className="flex gap-3 rounded-xl bg-white/75 px-3 py-3 text-sm font-semibold leading-6 text-slate-600">
-            <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" />
-            <span>{item}</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function AppointmentsPanel() {
-  return (
-    <section className="rounded-[1.5rem] bg-ink p-6 text-white shadow-soft">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-gold-300">Live workspace preview</p>
-          <h2 className="mt-2 font-display text-3xl">Today at a glance</h2>
-        </div>
-        <Pill>Clinic schedule</Pill>
-      </div>
-      <div className="mt-6 grid gap-3">
-        {sampleAppointments.map((appointment) => (
-          <div key={`${appointment.time}-${appointment.patient}`} className="grid gap-3 rounded-2xl border border-white/10 bg-white/8 p-4 sm:grid-cols-[110px_1fr_auto] sm:items-center">
-            <p className="font-bold text-gold-300">{appointment.time}</p>
-            <div>
-              <p className="font-bold">{appointment.patient}</p>
-              <p className="mt-1 text-sm text-white/55">{appointment.service}</p>
-            </div>
-            <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-white/75">{appointment.status}</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function DocumentationPanel({ role }: { role: SupportedRole }) {
-  const isDoctorLike = role === 'DOCTOR' || role === 'OWNER'
-
-  return (
-    <section className="rounded-[1.5rem] border border-teal-100 bg-white p-6 shadow-card">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-teal-600">AI documentation preparation</p>
-          <h2 className="mt-2 font-display text-3xl text-ink">
-            {isDoctorLike ? 'Clinical note assistant' : 'Documentation access boundary'}
-          </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-            {isDoctorLike
-              ? 'Doctors can draft notes from rough text, then review, edit, and approve the final clinical record.'
-              : 'This role can see operational patient context but should not generate or finalize clinical notes by default.'}
-          </p>
-        </div>
-        <span className="inline-flex items-center gap-2 rounded-full bg-teal-50 px-4 py-2 text-xs font-extrabold text-teal-700">
-          <Sparkles className="h-4 w-4" />
-          Doctor review required
-        </span>
-      </div>
-      <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
-        <div className="rounded-2xl bg-[#f5faf9] p-5">
-          <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-teal-700">Rough note input</p>
-          <p className="mt-4 min-h-28 rounded-xl border border-teal-100 bg-white p-4 text-sm leading-6 text-slate-500">
-            pain upper right, cold sensitivity, deep caries 16, composite filling done, advised follow up
-          </p>
-        </div>
-        <div className="rounded-2xl border border-slate-100 p-5">
-          <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-teal-700">Generated draft preview</p>
-          <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-            <p><strong className="text-ink">Chief complaint:</strong> Upper right pain with cold sensitivity.</p>
-            <p><strong className="text-ink">Findings:</strong> Deep caries noted on tooth 16.</p>
-            <p><strong className="text-ink">Treatment:</strong> Composite restoration completed.</p>
-            <p><strong className="text-ink">Plan:</strong> Follow-up advised if symptoms persist.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function TeamPanel() {
-  return (
-    <section className="rounded-[1.5rem] border border-teal-100 bg-white p-6 shadow-card">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-teal-600">Team snapshot</p>
-          <h2 className="mt-2 font-display text-3xl text-ink">Staff and roles</h2>
-        </div>
-        <UserCog className="h-7 w-7 text-teal-600" />
-      </div>
-      <div className="mt-6 grid gap-3">
-        {sampleTeam.map((member) => (
-          <div key={member.name} className="flex items-center justify-between gap-4 rounded-2xl bg-[#f5faf9] px-4 py-4">
-            <div>
-              <p className="font-bold text-ink">{member.name}</p>
-              <p className="mt-1 text-xs font-semibold text-slate-500">{member.role}</p>
-            </div>
-            <span className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-teal-700">{member.state}</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
 function OwnerEntryCard({
   href,
   eyebrow,
@@ -564,11 +402,57 @@ function OwnerEntryCard({
     >
       <Icon className={`absolute -right-5 -top-5 h-28 w-28 ${isDark ? 'text-white/10' : 'text-teal-100'}`} />
       <div className="relative">
-        <p className={`text-xs font-extrabold uppercase tracking-[0.18em] ${isDark ? 'text-gold-300' : 'text-teal-600'}`}>{eyebrow}</p>
+        <p className={`break-words text-xs font-extrabold uppercase tracking-[0.18em] ${isDark ? 'text-gold-300' : 'text-teal-600'}`}>{eyebrow}</p>
         <h2 className={`mt-3 break-words font-display text-3xl leading-tight ${isDark ? 'text-white' : 'text-ink'}`}>{title}</h2>
         <p className={`mt-3 max-w-xl break-words text-sm leading-6 ${isDark ? 'text-white/65' : 'text-slate-500'}`}>{text}</p>
         <span className={`mt-5 inline-flex items-center gap-2 text-sm font-bold ${isDark ? 'text-gold-300' : 'text-teal-700'}`}>
           Open dashboard
+          <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+        </span>
+      </div>
+    </a>
+  )
+}
+
+function DoctorNoteDraftOption({ href }: { href: string }) {
+  return (
+    <a
+      href={href}
+      className="group relative block w-full min-w-0 max-w-full overflow-hidden rounded-[1.5rem] border border-teal-100 bg-white p-6 text-ink shadow-card transition hover:-translate-y-0.5 hover:border-teal-300"
+    >
+      <Sparkles className="absolute -right-5 -top-5 h-28 w-28 text-teal-100" />
+      <div className="relative">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="break-words text-xs font-extrabold uppercase tracking-[0.18em] text-teal-600">Review required</p>
+            <h2 className="mt-3 break-words font-display text-3xl leading-tight text-ink">AI clinical note draft</h2>
+            <p className="mt-3 max-w-2xl break-words text-sm leading-6 text-slate-500">
+              Open the clinical note assistant to turn rough case notes into a structured draft before final approval.
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-2 rounded-full bg-teal-50 px-4 py-2 text-xs font-extrabold text-teal-700">
+            <Sparkles className="h-4 w-4" />
+            Doctor review required
+          </span>
+        </div>
+
+        <div className="mt-5 grid gap-3 lg:grid-cols-2">
+          <div className="rounded-2xl bg-[#f5faf9] p-4">
+            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-teal-700">Rough note input</p>
+            <p className="mt-3 rounded-xl border border-teal-100 bg-white p-3 text-sm leading-6 text-slate-500">
+              pain upper right, cold sensitivity, deep caries 16, composite filling done
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-white/80 p-4">
+            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-teal-700">Generated draft preview</p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Chief complaint, findings, treatment, and follow-up plan prepared for doctor review.
+            </p>
+          </div>
+        </div>
+
+        <span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-teal-700">
+          Open assistant
           <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
         </span>
       </div>
@@ -668,6 +552,138 @@ function OwnerServicesSection({ config }: { config: RoleConfig }) {
   )
 }
 
+function getMetricIcon(index: number) {
+  return [CalendarCheck, UsersRound, ShieldCheck][index] ?? ShieldCheck
+}
+
+function getFocusIcon(index: number) {
+  return [UserCog, ListChecks, CalendarDays, Stethoscope][index] ?? ListChecks
+}
+
+function RoleServicesSection({ config }: { config: RoleConfig }) {
+  return (
+    <section id="your-services" className="mt-10 w-full max-w-full rounded-[2rem] bg-ink p-6 text-white shadow-soft sm:p-8 lg:p-10">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-[0.22em] text-gold-300">Collected workspace</p>
+          <h2 className="mt-3 font-display text-4xl leading-tight text-white sm:text-5xl">Your Services</h2>
+        </div>
+        <p className="max-w-xl text-sm leading-6 text-white/60">
+          Role access, available tools, and service boundaries are grouped here so the main workspace stays focused.
+        </p>
+      </div>
+
+      <div className="mt-8 grid gap-4 md:grid-cols-3">
+        {config.metrics.map((item, index) => (
+          <OwnerServiceCard
+            key={item.title}
+            title={item.text}
+            text={item.meta}
+            meta={item.title}
+            icon={getMetricIcon(index)}
+          />
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-5">
+        <OwnerServiceCard title={`${config.label} access included`} items={config.permissions} icon={ShieldCheck} />
+        <OwnerServiceCard title="Daily tools included" items={config.practicalPermissions} icon={ListChecks} />
+        <OwnerServiceCard title="Not shown by default" items={config.restricted} icon={LockKeyhole} tone="restricted" />
+      </div>
+    </section>
+  )
+}
+
+function RoleWorkSection({ config, token }: { config: RoleConfig; token: string }) {
+  return (
+    <section className="mt-6 grid gap-5 lg:grid-cols-2">
+      {config.focusPanels.map((item, index) => {
+        const href = withPlaceholderRoute(token, config.role, item.title)
+
+        if (config.role === 'DOCTOR' && item.title === 'AI clinical note draft') {
+          return <DoctorNoteDraftOption key={item.title} href={href} />
+        }
+
+        return (
+          <OwnerEntryCard
+            key={item.title}
+            href={href}
+            eyebrow={item.meta ?? config.accent}
+            title={item.title}
+            text={item.text}
+            icon={getFocusIcon(index)}
+            tone={index === 0 ? 'dark' : 'light'}
+          />
+        )
+      })}
+    </section>
+  )
+}
+
+function CleanRoleDashboard({ config, token }: { config: RoleConfig; token: string }) {
+  const Icon = config.icon
+
+  return (
+    <main className="min-h-screen overflow-x-hidden bg-[#f5faf9]">
+      <aside className="overflow-x-hidden border-b border-teal-100 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-7xl flex-col items-start gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-8">
+          <a href={withAccessQuery(token, config.role, 'overview')} className="flex items-center gap-3">
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-gold-300">
+              <PanelTop className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-bold tracking-[0.22em] text-ink">AURORA</p>
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.26em] text-teal-600">Clinic platform</p>
+            </div>
+          </a>
+          <div className="flex w-full min-w-0 max-w-full gap-2 overflow-x-auto pb-1 sm:w-auto sm:pb-0">
+            {config.nav.map((item) => (
+              <a
+                key={item}
+                href={withAccessQuery(token, config.role, item.toLowerCase())}
+                className="shrink-0 rounded-full border border-teal-100 bg-white px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-ink transition hover:border-teal-300 hover:bg-teal-50"
+              >
+                {item}
+              </a>
+            ))}
+            <a href="#your-services" className="shrink-0 rounded-full border border-teal-100 bg-white px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-ink transition hover:border-teal-300 hover:bg-teal-50">
+              Your Services
+            </a>
+          </div>
+        </div>
+      </aside>
+
+      <section className="mx-auto w-full max-w-7xl px-5 py-8 lg:px-8 lg:py-10">
+        <div className="w-full max-w-full overflow-hidden rounded-[1.75rem] bg-white p-6 shadow-soft sm:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-ink text-gold-300">
+                  <Icon className="h-6 w-6" />
+                </span>
+                <Pill>{config.label}</Pill>
+                <Pill>{config.accent}</Pill>
+              </div>
+              <p className="mt-7 text-xs font-extrabold uppercase tracking-[0.24em] text-teal-600">{config.eyebrow}</p>
+              <h1 className="mt-3 max-w-4xl break-words font-display text-4xl leading-[1.05] text-ink sm:text-6xl">{config.title}</h1>
+              <p className="mt-5 max-w-3xl break-words leading-7 text-slate-600">{config.summary}</p>
+            </div>
+            <div className="w-full max-w-full rounded-2xl border border-teal-100 bg-[#f5faf9] p-4 lg:w-72">
+              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">Secure workspace</p>
+              <p className="mt-3 text-xs leading-5 text-slate-500">This view is prepared for the signed-in {config.label.toLowerCase()}.</p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">Role-specific tools stay near the top.</p>
+            </div>
+          </div>
+        </div>
+
+        <RoleWorkSection config={config} token={token} />
+
+        <RoleServicesSection config={config} />
+      </section>
+    </main>
+  )
+}
+
 function OwnerDashboard({ config, token }: { config: RoleConfig; token: string }) {
   const Icon = config.icon
 
@@ -715,7 +731,7 @@ function OwnerDashboard({ config, token }: { config: RoleConfig; token: string }
 
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <OwnerEntryCard
-            href="/employee-admin"
+            href={withPlaceholderRoute(token, config.role, 'Employee dashboard')}
             eyebrow="Employee dashboard"
             title="Review a day's work in minutes."
             text="See employees, review work, manage staff-related actions, and keep the clinic overview in one focused place."
@@ -723,21 +739,11 @@ function OwnerDashboard({ config, token }: { config: RoleConfig; token: string }
             tone="dark"
           />
           <OwnerEntryCard
-            href={withAccessQuery(token, 'DOCTOR', 'doctor-services')}
+            href={withPlaceholderRoute(token, config.role, 'Doctor mode')}
             eyebrow="Doctor mode"
             title="All your needs, in one place."
             text="Open doctor services, clinical documentation, treatment notes, and owner-doctor workflows without cluttering this page."
             icon={Stethoscope}
-          />
-        </div>
-
-        <div className="mt-6">
-          <OwnerEntryCard
-            href="/employee-admin"
-            eyebrow="Today at a glance"
-            title="Review the clinic flow without fake previews."
-            text="Open the employee dashboard to inspect schedules, bookings, slot work, and daily operational activity."
-            icon={CalendarDays}
           />
         </div>
 
@@ -748,127 +754,11 @@ function OwnerDashboard({ config, token }: { config: RoleConfig; token: string }
 }
 
 function RoleDashboard({ config, token }: { config: RoleConfig; token: string }) {
-  const Icon = config.icon
-
   if (config.role === 'OWNER') {
     return <OwnerDashboard config={config} token={token} />
   }
 
-  return (
-    <main className="min-h-screen bg-[#f5faf9]">
-      <aside className="border-b border-teal-100 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <a href={withAccessQuery(token, config.role, 'overview')} className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-gold-300">
-              <PanelTop className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="font-bold tracking-[0.22em] text-ink">AURORA</p>
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.26em] text-teal-600">Clinic platform</p>
-            </div>
-          </a>
-          <nav className="flex gap-2 overflow-x-auto pb-1 lg:pb-0">
-            {config.nav.map((item) => (
-              <a
-                key={item}
-                href={withAccessQuery(token, config.role, item.toLowerCase())}
-                className="shrink-0 rounded-full border border-teal-100 bg-white px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-ink transition hover:border-teal-300 hover:bg-teal-50"
-              >
-                {item}
-              </a>
-            ))}
-          </nav>
-        </div>
-      </aside>
-
-      <section className="mx-auto max-w-7xl px-5 py-8 lg:px-8 lg:py-10">
-        <div className="grid gap-6 lg:grid-cols-[1fr_330px]">
-          <div className="rounded-[1.75rem] bg-white p-6 shadow-soft sm:p-8">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-ink text-gold-300">
-                    <Icon className="h-6 w-6" />
-                  </span>
-                  <Pill>{config.label}</Pill>
-                  <Pill>{config.accent}</Pill>
-                </div>
-                <p className="mt-7 text-xs font-extrabold uppercase tracking-[0.24em] text-teal-600">{config.eyebrow}</p>
-                <h1 className="mt-3 max-w-4xl font-display text-4xl leading-[1.05] text-ink sm:text-6xl">{config.title}</h1>
-                <p className="mt-5 max-w-3xl leading-7 text-slate-600">{config.summary}</p>
-              </div>
-              <div className="rounded-2xl border border-teal-100 bg-[#f5faf9] p-4 lg:w-72">
-                <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">Secure workspace</p>
-                <p className="mt-3 text-xs leading-5 text-slate-500">This view is prepared for the signed-in staff member.</p>
-                <p className="mt-2 text-xs leading-5 text-slate-500">Access details stay hidden from the workspace.</p>
-              </div>
-            </div>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <button type="button" className="min-h-12 rounded-full bg-ink px-6 text-sm font-bold text-white transition hover:bg-teal-700">
-                {config.primaryAction}
-              </button>
-              <button type="button" className="min-h-12 rounded-full border border-teal-200 bg-white px-6 text-sm font-bold text-ink transition hover:border-teal-400 hover:bg-teal-50">
-                {config.secondaryAction}
-              </button>
-            </div>
-          </div>
-
-          <section className="rounded-[1.75rem] bg-ink p-6 text-white shadow-soft">
-            <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-gold-300">Clinic responsibilities</p>
-            <div className="mt-5 space-y-4 text-sm leading-6 text-white/70">
-              <p><strong className="text-white">Owner</strong> owns the business.</p>
-              <p><strong className="text-white">Manager</strong> runs the day.</p>
-              <p><strong className="text-white">Receptionist</strong> handles bookings.</p>
-              <p><strong className="text-white">Doctor</strong> handles treatment and clinical notes.</p>
-            </div>
-          </section>
-        </div>
-
-        <div className="mt-6 grid gap-4 md:grid-cols-3">
-          {config.metrics.map((item) => <MetricCard key={item.title} item={item} />)}
-        </div>
-
-        <div className="mt-8 grid gap-5 lg:grid-cols-4">
-          {config.focusPanels.map((item, index) => <FocusCard key={item.title} item={item} index={index} />)}
-        </div>
-
-        <div className="mt-8 grid gap-6 xl:grid-cols-[1.1fr_.9fr]">
-          <AppointmentsPanel />
-          <TeamPanel />
-        </div>
-
-        <div className="mt-8">
-          <DocumentationPanel role={config.role} />
-        </div>
-
-        <div className="mt-8 grid gap-6">
-          <ListPanel title={`${config.label} access included`} items={config.permissions} icon={ShieldCheck} />
-          <ListPanel title="Daily tools included" items={config.practicalPermissions} icon={ListChecks} />
-          {config.carefulActions && (
-            <ListPanel title="High-risk owner actions separated" items={config.carefulActions} icon={AlertTriangle} tone="careful" />
-          )}
-          <ListPanel title="Not shown by default" items={config.restricted} icon={LockKeyhole} tone="restricted" />
-        </div>
-
-        <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-          {[
-            [CalendarDays, 'Responsive schedule areas'],
-            [FileText, 'Prepared work areas'],
-            [MessageSquareText, 'Communication notes'],
-            [Activity, 'Activity trail'],
-          ].map(([IconItem, label]) => {
-            const TileIcon = IconItem as LucideIcon
-            return (
-              <div key={label as string} className="rounded-2xl border border-teal-100 bg-white p-5 shadow-card">
-                <TileIcon className="h-6 w-6 text-teal-600" />
-                <p className="mt-4 font-bold text-ink">{label as string}</p>
-              </div>
-            )
-          })}
-        </div>
-      </section>
-    </main>
-  )
+  return <CleanRoleDashboard config={config} token={token} />
 }
 
 export default function RoleDashboardPage() {

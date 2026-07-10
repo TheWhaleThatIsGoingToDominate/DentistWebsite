@@ -1,4 +1,5 @@
 import type { AppointmentSlot } from '../context/ScheduleContext'
+import { loadEmployeeSession } from './employeeAccess'
 
 // Set this to your backend origin if it is different from the frontend origin.
 const SCHEDULE_API_BASE_URL = 'https://clinic-auth.vercel.app'
@@ -98,6 +99,26 @@ type ApiErrorResponse = {
   message?: string
 }
 
+function getEmployeeAdminHeaders(includeJson = false) {
+  const session = loadEmployeeSession()
+
+  if (!session) {
+    throw new Error('Employee session is missing. Please sign in again.')
+  }
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${session.token}`,
+    'X-Employee-Username': session.username,
+    'X-Employee-Phone': session.phone_number,
+  }
+
+  if (includeJson) {
+    headers['Content-Type'] = 'application/json'
+  }
+
+  return headers
+}
+
 function normalizeBookingRecord(booking: BackendBookingRecord): BookingRecord {
   return {
     booking_reference: booking.booking_reference ?? booking.reference_code ?? booking.id,
@@ -131,11 +152,9 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
 export async function generateSlotsFromBackend(
   requestData: GenerateSlotsRequest,
 ): Promise<GenerateSlotsResponse> {
-  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/generate`, {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/admin/generate`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getEmployeeAdminHeaders(true),
     body: JSON.stringify(requestData),
   })
 
@@ -145,8 +164,9 @@ export async function generateSlotsFromBackend(
 
 export async function loadSlotsFromBackend(date: string): Promise<LoadSlotsResponse> {
   const searchParams = new URLSearchParams({ date })
-  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/slots?${searchParams.toString()}`, {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/admin/slots?${searchParams.toString()}`, {
     method: 'GET',
+    headers: getEmployeeAdminHeaders(),
   })
 
   return readJsonResponse<LoadSlotsResponse>(response)
@@ -165,11 +185,9 @@ export async function loadPublicBookingSlotsFromBackend(date: string): Promise<L
 export async function saveSlotsToBackend(
   requestData: SaveSlotsRequest,
 ): Promise<SaveSlotsResponse> {
-  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/saveSlots`, {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/admin/saveSlots`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getEmployeeAdminHeaders(true),
     body: JSON.stringify(requestData),
   })
 
@@ -179,11 +197,9 @@ export async function saveSlotsToBackend(
 export async function updateSlotStatusInBackend(
   slot: AppointmentSlot,
 ): Promise<UpdateSlotStatusResponse> {
-  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/changeState`, {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/admin/changeState`, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getEmployeeAdminHeaders(true),
     body: JSON.stringify(slot),
   })
 
@@ -192,8 +208,9 @@ export async function updateSlotStatusInBackend(
 
 export async function fetchBookingsFromBackend(date: string): Promise<BookingRecord[]> {
   const searchParams = new URLSearchParams({ date })
-  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/loadBooking?${searchParams.toString()}`, {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/admin/loadBooking?${searchParams.toString()}`, {
     method: 'GET',
+    headers: getEmployeeAdminHeaders(),
   })
 
   const bookings = await readJsonResponse<BackendBookingRecord[]>(response)
@@ -249,11 +266,9 @@ export async function cancelBookingFromBackend(
 export async function updateBookingStatusInBackend(
   requestData: UpdateBookingStatusRequest,
 ): Promise<BookingRecord | { message: string }> {
-  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/booking/status`, {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/admin/booking/status`, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getEmployeeAdminHeaders(true),
     body: JSON.stringify(requestData),
   })
 
@@ -262,11 +277,9 @@ export async function updateBookingStatusInBackend(
 }
 
 export async function deleteBookingInBackend(bookingReference: string): Promise<{ deleted?: boolean; message?: string }> {
-  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/booking/delete`, {
+  const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/admin/booking/delete`, {
     method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getEmployeeAdminHeaders(true),
     body: JSON.stringify({
       booking_reference: bookingReference,
     }),

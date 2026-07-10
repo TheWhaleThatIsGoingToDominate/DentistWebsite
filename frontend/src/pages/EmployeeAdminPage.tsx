@@ -3,7 +3,12 @@ import { AlertCircle, CheckCircle2, Loader2, LockKeyhole, RefreshCw, Save } from
 import { AppointmentSlot, useSchedule } from '../context/ScheduleContext'
 import {
   EmployeeIdentityVerificationResponse,
+  authenticateEmployeeAccess,
   checkEmployeeAccessKey,
+  clearEmployeeSessionInBackend,
+  clearStoredEmployeeSession,
+  loadEmployeeSession,
+  saveEmployeeSession,
   verifyEmployeeIdentity,
 } from '../utils/employeeAccess'
 import {
@@ -35,6 +40,12 @@ const bookingStatusLabels: Record<BookingStatus, string> = {
 }
 
 const employeePhonePattern = /^01\d{9}$/
+const sessionDurationOptions = [
+  { label: '0.5h', value: 30 },
+  { label: '1h', value: 60 },
+  { label: '2h', value: 120 },
+  { label: '3h', value: 180 },
+]
 
 function FieldStatus({
   tone,
@@ -129,6 +140,7 @@ export default function EmployeeAdminPage() {
   const [username, setUsername] = useState('')
   const [employeePhoneNumber, setEmployeePhoneNumber] = useState('')
   const [employeePassword, setEmployeePassword] = useState('')
+  const [tokenDuration, setTokenDuration] = useState(60)
   const [accessError, setAccessError] = useState('')
   const [identityVerification, setIdentityVerification] = useState<EmployeeIdentityVerificationResponse | null>(null)
   const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false)
@@ -201,6 +213,41 @@ export default function EmployeeAdminPage() {
       setIsLoadingBookings(false)
     }
   }, [bookingDateFilter, selectedDate])
+
+  useEffect(() => {
+    if (hasAccess) {
+      return
+    }
+
+    const storedSession = loadEmployeeSession()
+
+    if (!storedSession) {
+      return
+    }
+
+    clearStoredEmployeeSession()
+    void clearEmployeeSessionInBackend(storedSession)
+  }, [hasAccess])
+
+  useEffect(() => {
+    if (!hasAccess) {
+      return
+    }
+
+    const handlePageHide = () => {
+      const storedSession = loadEmployeeSession()
+
+      if (storedSession) {
+        void clearEmployeeSessionInBackend(storedSession, { keepalive: true })
+      }
+    }
+
+    window.addEventListener('pagehide', handlePageHide)
+
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide)
+    }
+  }, [hasAccess])
 
   useEffect(() => {
     if (!hasAccess) {
@@ -310,6 +357,7 @@ export default function EmployeeAdminPage() {
           username: trimmedUsername,
           phone_number: trimmedPhoneNumber,
           password: employeePassword,
+          tokenDuration,
         })
 
         if (!ignoreResponse) {
@@ -326,7 +374,7 @@ export default function EmployeeAdminPage() {
       ignoreResponse = true
       window.clearTimeout(timeoutId)
     }
-  }, [employeePassword, hasAccess, isIdentityVerified, trimmedPhoneNumber, trimmedUsername])
+  }, [employeePassword, hasAccess, isIdentityVerified, tokenDuration, trimmedPhoneNumber, trimmedUsername])
 
   const handleAccessSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -343,18 +391,25 @@ export default function EmployeeAdminPage() {
       return
     }
 
-    const allowed = await checkEmployeeAccessKey({
+    const authentication = await authenticateEmployeeAccess({
       username: trimmedUsername,
       phone_number: trimmedPhoneNumber,
       password: employeePassword,
+      tokenDuration,
     })
 
-    if (!allowed) {
+    if (authentication?.allowed !== true || !authentication.token) {
       setAccessError('Invalid employee login')
       setHasAccess(false)
       return
     }
 
+    saveEmployeeSession({
+      username: trimmedUsername,
+      phone_number: trimmedPhoneNumber,
+      token: authentication.token,
+      tokenDuration,
+    })
     setAccessError('')
     setHasAccess(true)
   }
@@ -580,6 +635,24 @@ export default function EmployeeAdminPage() {
             {isIdentityVerified && passwordVerificationStatus === 'error' && (
               <FieldStatus tone="error" message="Unable to verify details right now. Please try again." />
             )}
+          </label>
+          <label className="form-label mt-4">
+            Stay signed in for:
+            <select
+              className="form-input"
+              value={tokenDuration}
+              onChange={(event) => {
+                setTokenDuration(Number(event.target.value))
+                setAccessError('')
+              }}
+              required
+            >
+              {sessionDurationOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
           <button
             type="submit"
