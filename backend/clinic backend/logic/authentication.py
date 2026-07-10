@@ -386,21 +386,24 @@ def auth(username, phone_number, password, valid_time: int):
         )
     else:
         if password_verifier(password, username, phone_number):
-            token, token_expiry_time= create_token(username, phone_number, valid_time)
             #role extraction
-            # theRole = (
-            #     supabase.table("employees")
-            #     .select("role")
-            #     .eq("username", username)
-            #     .eq("phone_number", phone_number)
-            #     .execute().data
-            # )
-            # if not theRole:
-            #     raise HTTPException(status_code=500, detail="Employee role is missing")
-            # if not theRole[0].get("role"):
-            #     raise HTTPException(status_code=500, detail="Employee role is missing")
-            # role = theRole[0]["role"]
-            return {"allowed":True, "token":token, "expires_at":token_expiry_time}#, "role":role}
+            theRole = (
+                supabase.table("employees")
+                .select("role")
+                .eq("username", username)
+                .eq("phone_number", phone_number)
+                .execute().data
+            )
+            if not theRole:
+                raise HTTPException(status_code=500, detail="Employee role is missing")
+            if not theRole[0].get("role"):
+                raise HTTPException(status_code=500, detail="Employee role is missing")
+            role = str(theRole[0]["role"]).upper()
+
+            #token creation with expiry time
+            token, token_expiry_time= create_token(username, phone_number, valid_time)
+
+            return {"allowed":True, "token":token, "expires_at":token_expiry_time, "role":role}
         else:
             raise HTTPException(
                 status_code=401,
