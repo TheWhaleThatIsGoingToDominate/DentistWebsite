@@ -89,8 +89,12 @@ export async function authenticateEmployeeAccess(
     }),
   })
 
-  if (!response.ok) {
+  if (response.status === 401 || response.status === 404) {
     return null
+  }
+
+  if (!response.ok) {
+    throw new Error('Employee authentication request failed')
   }
 
   return response.json() as Promise<EmployeeAuthenticationResponse>

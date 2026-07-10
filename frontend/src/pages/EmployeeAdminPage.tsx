@@ -391,12 +391,20 @@ export default function EmployeeAdminPage() {
       return
     }
 
-    const authentication = await authenticateEmployeeAccess({
-      username: trimmedUsername,
-      phone_number: trimmedPhoneNumber,
-      password: employeePassword,
-      tokenDuration,
-    })
+    let authentication = null
+
+    try {
+      authentication = await authenticateEmployeeAccess({
+        username: trimmedUsername,
+        phone_number: trimmedPhoneNumber,
+        password: employeePassword,
+        tokenDuration,
+      })
+    } catch {
+      setAccessError('Unable to verify details right now. Please try again.')
+      setHasAccess(false)
+      return
+    }
 
     if (authentication?.allowed !== true || !authentication.token) {
       setAccessError('Invalid employee login')

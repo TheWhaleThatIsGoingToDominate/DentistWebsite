@@ -132,7 +132,7 @@ def create_token(username: str, phone_number: str, valid_time: int): #helper fun
     4. when the expirey time has finished (or when the login page is entered), you delete the hashed token, its salt, and the valid_time of it
     """
     token = str(uuid.uuid4()) #create token
-    token_creation_time= datetime.now(ZoneInfo("Africa/cairo")) #gather the time where the token was created
+    token_creation_time= datetime.now(timezone.utc) #gather the time where the token was created
     token_expiry_time = token_creation_time + timedelta(minutes=valid_time)
     hashed_token , token_salt = create_new_hash_forpassword_or_token(token) #hash token, obtain its salt
 
@@ -143,15 +143,15 @@ def create_token(username: str, phone_number: str, valid_time: int): #helper fun
             "hashed_token":hashed_token,
             "token_salt":token_salt,
             "valid_time": valid_time,
-            "token_creation_time":token_creation_time, 
-            "token_expiry_time":token_expiry_time
+            "token_creation_time":token_creation_time.isoformat(), 
+            "token_expiry_time":token_expiry_time.isoformat()
             })
         .eq("username", username)
         .eq("phone_number", phone_number)
         .execute()
     )
 
-    return token, token_expiry_time
+    return token, token_expiry_time.isoformat()
 
 def token_hash_verifier(hashed_token: str, token_salt: str, theToken: str): #helper function
     theToken = str(theToken).encode()
@@ -334,13 +334,26 @@ def auth(username, phone_number, password, valid_time: int):
     else:
         if password_verifier(password, username, phone_number):
             token, token_expiry_time= create_token(username, phone_number, valid_time)
-            # TODO: MAKE TOKEN SYSTEM
-            return {"allowed":True, "token":token, "expires_at":token_expiry_time}
+            #role extraction
+            # theRole = (
+            #     supabase.table("employees")
+            #     .select("role")
+            #     .eq("username", username)
+            #     .eq("phone_number", phone_number)
+            #     .execute().data
+            # )
+            # if not theRole:
+            #     raise HTTPException(status_code=500, detail="Employee role is missing")
+            # if not theRole[0].get("role"):
+            #     raise HTTPException(status_code=500, detail="Employee role is missing")
+            # role = theRole[0]["role"]
+            return {"allowed":True, "token":token, "expires_at":token_expiry_time}#, "role":role}
         else:
             raise HTTPException(
                 status_code=401,
                 detail="unauthorized, wrong password"
             )
+        
         #this executes when the username and number are legit, we hash the password with the old salt, and then compare
 
 
