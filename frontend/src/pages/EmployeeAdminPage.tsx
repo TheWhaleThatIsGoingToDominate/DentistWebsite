@@ -233,7 +233,7 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
   }, [hasAccess])
 
   useEffect(() => {
-    if (!hasAccess) {
+    if (!hasAccess || embeddedSection) {
       return
     }
 
@@ -250,7 +250,7 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
     return () => {
       window.removeEventListener('pagehide', handlePageHide)
     }
-  }, [hasAccess])
+  }, [embeddedSection, hasAccess])
 
   useEffect(() => {
     if (!hasAccess) {
