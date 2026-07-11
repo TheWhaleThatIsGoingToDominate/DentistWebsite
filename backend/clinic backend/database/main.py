@@ -11,12 +11,6 @@ key = os.environ.get("SUPABASE_KEY")
 supabase = create_client(url, key)
 
 
-
-print(
-    supabase.table("employees")
-    .select("created_at")
-    .execute().data
-)
 # import ast #the module to convert such a string "['1', '2', '3']" to a functioning list
 # data, count = response.split()
 # data = data[data.find("["):] #<<<< this the actual data of the database, represented in a list
@@ -35,7 +29,6 @@ print(
 # #the saving code
 # from logic.saveSlots import emptyDatabaseCheck, load_data#< "data" is the variable holding the data of the database
 # #    ^^^^^ SyntaxError: no module named "logic"
-# #TODO: Fix the errors in here, you have 5 major issues chatgpt pointed out.
 # def save_slots(slots: list): 
 #     notAddedTimes = []
 #     theCheck = emptyDatabaseCheck()

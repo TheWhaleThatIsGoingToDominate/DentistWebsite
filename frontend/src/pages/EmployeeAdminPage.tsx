@@ -42,6 +42,7 @@ const bookingStatusLabels: Record<BookingStatus, string> = {
 
 const employeePhonePattern = /^01\d{9}$/
 const sessionDurationOptions = [
+  { label: '1m', value: 1 },
   { label: '0.5h', value: 30 },
   { label: '1h', value: 60 },
   { label: '2h', value: 120 },
