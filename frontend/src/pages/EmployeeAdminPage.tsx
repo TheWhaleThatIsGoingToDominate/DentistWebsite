@@ -2,9 +2,9 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertCircle, CheckCircle2, Loader2, LockKeyhole, RefreshCw, Save } from 'lucide-react'
 import { AppointmentSlot, useSchedule } from '../context/ScheduleContext'
 import {
+  EmployeeAuthenticationResponse,
   EmployeeIdentityVerificationResponse,
   authenticateEmployeeAccess,
-  checkEmployeeAccessKey,
   clearEmployeeSessionInBackend,
   clearStoredEmployeeSession,
   isEmployeeRole,
@@ -136,18 +136,19 @@ function generateSlots(startTime: string, endTime: string, slotLength: number): 
   return slots
 }
 
-export default function EmployeeAdminPage() {
+export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection?: AdminSection } = {}) {
   const { getSlotsForDate, setSlotsForDate, updateSlotForDate, updateSlotStatus } = useSchedule()
-  const [hasAccess, setHasAccess] = useState(false)
+  const [hasAccess, setHasAccess] = useState(() => embeddedSection ? loadEmployeeSession() !== null : false)
   const [username, setUsername] = useState('')
   const [employeePhoneNumber, setEmployeePhoneNumber] = useState('')
   const [employeePassword, setEmployeePassword] = useState('')
-  const [tokenDuration, setTokenDuration] = useState(60)
+  const [tokenDuration, setTokenDuration] = useState<number | ''>('')
   const [accessError, setAccessError] = useState('')
   const [identityVerification, setIdentityVerification] = useState<EmployeeIdentityVerificationResponse | null>(null)
   const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false)
   const [identityVerificationError, setIdentityVerificationError] = useState('')
   const [passwordVerificationStatus, setPasswordVerificationStatus] = useState<PasswordVerificationStatus>('idle')
+  const [verifiedAuthentication, setVerifiedAuthentication] = useState<EmployeeAuthenticationResponse | null>(null)
   const [selectedDate, setSelectedDate] = useState(today)
   const [startTime, setStartTime] = useState('09:00 AM')
   const [endTime, setEndTime] = useState('05:00 PM')
@@ -157,13 +158,13 @@ export default function EmployeeAdminPage() {
   const [isSavingSlots, setIsSavingSlots] = useState(false)
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
   const [updatingSlotTime, setUpdatingSlotTime] = useState('')
-  const [activeSection, setActiveSection] = useState<AdminSection>('slots')
+  const [activeSection, setActiveSection] = useState<AdminSection>(embeddedSection ?? 'slots')
   const [bookings, setBookings] = useState<BookingRecord[]>([])
   const [isLoadingBookings, setIsLoadingBookings] = useState(false)
   const [bookingsError, setBookingsError] = useState('')
   const [bookingSearch, setBookingSearch] = useState('')
   const [bookingServiceFilter, setBookingServiceFilter] = useState('')
-  const [bookingDateFilter, setBookingDateFilter] = useState('')
+  const [bookingDateFilter, setBookingDateFilter] = useState(today)
   const [bookingStatusFilter, setBookingStatusFilter] = useState('')
   const [bookingActionMessage, setBookingActionMessage] = useState('')
   const [updatingBookingReference, setUpdatingBookingReference] = useState('')
@@ -295,6 +296,7 @@ export default function EmployeeAdminPage() {
   useEffect(() => {
     setEmployeePassword('')
     setPasswordVerificationStatus('idle')
+    setVerifiedAuthentication(null)
     setAccessError('')
   }, [trimmedPhoneNumber, trimmedUsername])
 
@@ -343,9 +345,10 @@ export default function EmployeeAdminPage() {
   }, [hasAccess, trimmedPhoneNumber, trimmedUsername])
 
   useEffect(() => {
-    if (hasAccess || !isIdentityVerified || !employeePassword) {
+    if (hasAccess || !isIdentityVerified || tokenDuration === '' || !employeePassword) {
       if (!employeePassword) {
         setPasswordVerificationStatus('idle')
+        setVerifiedAuthentication(null)
       }
       return
     }
@@ -355,7 +358,7 @@ export default function EmployeeAdminPage() {
 
     const timeoutId = window.setTimeout(async () => {
       try {
-        const allowed = await checkEmployeeAccessKey({
+        const authentication = await authenticateEmployeeAccess({
           username: trimmedUsername,
           phone_number: trimmedPhoneNumber,
           password: employeePassword,
@@ -363,10 +366,13 @@ export default function EmployeeAdminPage() {
         })
 
         if (!ignoreResponse) {
+          const allowed = authentication?.allowed === true && Boolean(authentication.token)
+          setVerifiedAuthentication(allowed ? authentication : null)
           setPasswordVerificationStatus(allowed ? 'verified' : 'incorrect')
         }
       } catch {
         if (!ignoreResponse) {
+          setVerifiedAuthentication(null)
           setPasswordVerificationStatus('error')
         }
       }
@@ -393,20 +399,13 @@ export default function EmployeeAdminPage() {
       return
     }
 
-    let authentication = null
-
-    try {
-      authentication = await authenticateEmployeeAccess({
-        username: trimmedUsername,
-        phone_number: trimmedPhoneNumber,
-        password: employeePassword,
-        tokenDuration,
-      })
-    } catch {
-      setAccessError('Unable to verify details right now. Please try again.')
+    if (tokenDuration === '') {
+      setAccessError('Select how long you want to stay signed in.')
       setHasAccess(false)
       return
     }
+
+    const authentication = verifiedAuthentication
 
     if (authentication?.allowed !== true || !authentication.token) {
       setAccessError('Invalid employee login')
@@ -429,12 +428,11 @@ export default function EmployeeAdminPage() {
     })
     setAccessError('')
 
-    // const dashboardParams = new URLSearchParams({
-    //   token: authentication.token,
-    //   role: authentication.role,
-    // })
-    // window.location.href = `/role-dashboard?${dashboardParams.toString()}`
-    setHasAccess(true)
+    const dashboardParams = new URLSearchParams({
+      token: authentication.token,
+      role: authentication.role,
+    })
+    window.location.href = `/role-dashboard?${dashboardParams.toString()}`
   }
 
   const handleGenerateSlots = async () => {
@@ -629,6 +627,29 @@ export default function EmployeeAdminPage() {
             </p>
           )}
           <label className="form-label mt-4">
+            Stay signed in for:
+            <select
+              className="form-input"
+              value={tokenDuration}
+              onChange={(event) => {
+                setTokenDuration(event.target.value ? Number(event.target.value) : '')
+                setEmployeePassword('')
+                setPasswordVerificationStatus('idle')
+                setVerifiedAuthentication(null)
+                setAccessError('')
+              }}
+              disabled={isPasswordVerified}
+              required
+            >
+              <option value="" disabled>Select a duration</option>
+              {sessionDurationOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-label mt-4">
             Password
             <input
               className="form-input"
@@ -636,15 +657,19 @@ export default function EmployeeAdminPage() {
               value={employeePassword}
               onChange={(event) => {
                 setEmployeePassword(event.target.value.replace(/\s/g, ''))
+                setVerifiedAuthentication(null)
                 setAccessError('')
               }}
               placeholder="Enter password"
               autoComplete="current-password"
-              disabled={!isIdentityVerified}
+              disabled={!isIdentityVerified || tokenDuration === ''}
               required
             />
             {!isIdentityVerified && (
               <FieldStatus tone="neutral" message="Password unlocks after username and phone number are verified." />
+            )}
+            {isIdentityVerified && tokenDuration === '' && (
+              <FieldStatus tone="neutral" message="Select a sign-in duration before entering your password." />
             )}
             {isIdentityVerified && passwordVerificationStatus === 'checking' && (
               <FieldStatus tone="neutral" message="Checking password..." isLoading />
@@ -658,24 +683,6 @@ export default function EmployeeAdminPage() {
             {isIdentityVerified && passwordVerificationStatus === 'error' && (
               <FieldStatus tone="error" message="Unable to verify details right now. Please try again." />
             )}
-          </label>
-          <label className="form-label mt-4">
-            Stay signed in for:
-            <select
-              className="form-input"
-              value={tokenDuration}
-              onChange={(event) => {
-                setTokenDuration(Number(event.target.value))
-                setAccessError('')
-              }}
-              required
-            >
-              {sessionDurationOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
           </label>
           <button
             type="submit"
@@ -695,14 +702,14 @@ export default function EmployeeAdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f5faf9] px-5 py-8 lg:px-8">
+    <div className={embeddedSection ? 'w-full' : 'min-h-screen bg-[#f5faf9] px-5 py-8 lg:px-8'}>
       <section className="mx-auto max-w-5xl">
-        <div className="flex flex-col gap-2 border-b border-teal-100 pb-6">
+        {!embeddedSection && <div className="flex flex-col gap-2 border-b border-teal-100 pb-6">
           <p className="text-xs font-extrabold uppercase tracking-[0.24em] text-teal-600">Reception schedule</p>
           <h1 className="font-display text-4xl text-ink sm:text-5xl">Employee admin</h1>
-        </div>
+        </div>}
 
-        <div className="mt-7 grid gap-3 rounded-[1.5rem] bg-white p-2 shadow-card sm:grid-cols-2">
+        {!embeddedSection && <div className="mt-7 grid gap-3 rounded-[1.5rem] bg-white p-2 shadow-card sm:grid-cols-2">
           <button
             type="button"
             onClick={() => setActiveSection('slots')}
@@ -725,7 +732,7 @@ export default function EmployeeAdminPage() {
           >
             Manage Bookings
           </button>
-        </div>
+        </div>}
 
         {activeSection === 'slots' && (
           <>
@@ -879,7 +886,7 @@ export default function EmployeeAdminPage() {
                 onClick={() => {
                   setBookingSearch('')
                   setBookingServiceFilter('')
-                  setBookingDateFilter('')
+                  setBookingDateFilter(today)
                   setBookingStatusFilter('')
                   setBookings([])
                   setBookingActionMessage('')
@@ -961,6 +968,6 @@ export default function EmployeeAdminPage() {
           </div>
         )}
       </section>
-    </main>
+    </div>
   )
 }

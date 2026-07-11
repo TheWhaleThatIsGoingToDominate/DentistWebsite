@@ -22,6 +22,7 @@ type DashboardItem = {
   title: string
   text: string
   meta?: string
+  routeTitle?: string
 }
 
 type RoleConfig = {
@@ -193,8 +194,8 @@ const ROLE_CONFIG: Record<SupportedRole, RoleConfig> = {
       { title: 'Follow-ups', text: '6 calls', meta: 'WhatsApp notes' },
     ],
     focusPanels: [
-      { title: 'Booking calendar', text: 'View available, booked, and blocked slots in the daily schedule.', meta: 'Front desk view' },
-      { title: 'Manual booking creation', text: 'Create, edit, reschedule, cancel, and update booking statuses.', meta: 'Patient-facing operations' },
+      { title: 'Manage booking slots', routeTitle: 'Booking calendar', text: 'View available, booked, and blocked slots in the daily schedule.', meta: 'Front desk view' },
+      { title: 'Manage bookings', routeTitle: 'Manual booking creation', text: 'Create, edit, reschedule, cancel, and update booking statuses.', meta: 'Patient-facing operations' },
       { title: 'Patient communication', text: 'Add non-clinical notes, call follow-ups, and WhatsApp reminders.', meta: 'No clinical notes' },
       { title: 'Reference recovery', text: 'Support booking confirmation and reference recovery workflows.', meta: 'Owner-controlled' },
     ],
@@ -382,30 +383,24 @@ function OwnerEntryCard({
   title,
   text,
   icon: Icon,
-  tone = 'light',
 }: {
   href: string
   eyebrow: string
   title: string
   text: string
   icon: LucideIcon
-  tone?: 'light' | 'dark'
 }) {
-  const isDark = tone === 'dark'
-
   return (
     <a
       href={href}
-      className={`group relative block w-full min-w-0 max-w-full overflow-hidden rounded-[1.5rem] p-6 shadow-card transition hover:-translate-y-0.5 ${
-        isDark ? 'bg-ink text-white' : 'border border-teal-100 bg-white text-ink'
-      }`}
+      className="group relative block w-full min-w-0 max-w-full overflow-hidden rounded-[1.5rem] border border-teal-100 bg-white p-6 text-ink shadow-card transition duration-300 hover:-translate-y-0.5 hover:border-teal-300 hover:bg-[#e7f0ef]"
     >
-      <Icon className={`absolute -right-5 -top-5 h-28 w-28 ${isDark ? 'text-white/10' : 'text-teal-100'}`} />
+      <Icon className="absolute -right-5 -top-5 h-28 w-28 text-teal-100 transition-colors duration-300 group-hover:text-teal-200" />
       <div className="relative">
-        <p className={`break-words text-xs font-extrabold uppercase tracking-[0.18em] ${isDark ? 'text-gold-300' : 'text-teal-600'}`}>{eyebrow}</p>
-        <h2 className={`mt-3 break-words font-display text-3xl leading-tight ${isDark ? 'text-white' : 'text-ink'}`}>{title}</h2>
-        <p className={`mt-3 max-w-xl break-words text-sm leading-6 ${isDark ? 'text-white/65' : 'text-slate-500'}`}>{text}</p>
-        <span className={`mt-5 inline-flex items-center gap-2 text-sm font-bold ${isDark ? 'text-gold-300' : 'text-teal-700'}`}>
+        <p className="break-words text-xs font-extrabold uppercase tracking-[0.18em] text-teal-600">{eyebrow}</p>
+        <h2 className="mt-3 break-words font-display text-3xl leading-tight text-ink">{title}</h2>
+        <p className="mt-3 max-w-xl break-words text-sm leading-6 text-slate-500">{text}</p>
+        <span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-teal-700">
           Open dashboard
           <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
         </span>
@@ -418,7 +413,7 @@ function DoctorNoteDraftOption({ href }: { href: string }) {
   return (
     <a
       href={href}
-      className="group relative block w-full min-w-0 max-w-full overflow-hidden rounded-[1.5rem] border border-teal-100 bg-white p-6 text-ink shadow-card transition hover:-translate-y-0.5 hover:border-teal-300"
+      className="group relative block w-full min-w-0 max-w-full overflow-hidden rounded-[1.5rem] border border-teal-100 bg-white p-6 text-ink shadow-card transition duration-300 hover:-translate-y-0.5 hover:border-teal-300 hover:bg-[#e7f0ef]"
     >
       <Sparkles className="absolute -right-5 -top-5 h-28 w-28 text-teal-100" />
       <div className="relative">
@@ -598,7 +593,7 @@ function RoleWorkSection({ config, token }: { config: RoleConfig; token: string 
   return (
     <section className="mt-6 grid gap-5 lg:grid-cols-2">
       {config.focusPanels.map((item, index) => {
-        const href = withPlaceholderRoute(token, config.role, item.title)
+        const href = withPlaceholderRoute(token, config.role, item.routeTitle ?? item.title)
 
         if (config.role === 'DOCTOR' && item.title === 'AI clinical note draft') {
           return <DoctorNoteDraftOption key={item.title} href={href} />
@@ -612,7 +607,6 @@ function RoleWorkSection({ config, token }: { config: RoleConfig; token: string 
             title={item.title}
             text={item.text}
             icon={getFocusIcon(index)}
-            tone={index === 0 ? 'dark' : 'light'}
           />
         )
       })}
@@ -736,7 +730,6 @@ function OwnerDashboard({ config, token }: { config: RoleConfig; token: string }
             title="Review a day's work in minutes."
             text="See employees, review work, manage staff-related actions, and keep the clinic overview in one focused place."
             icon={UserCog}
-            tone="dark"
           />
           <OwnerEntryCard
             href={withPlaceholderRoute(token, config.role, 'Doctor mode')}

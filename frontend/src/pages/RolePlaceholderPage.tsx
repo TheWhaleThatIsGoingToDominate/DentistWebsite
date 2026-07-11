@@ -14,6 +14,7 @@ import {
   UsersRound,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import EmployeeAdminPage from './EmployeeAdminPage'
 
 type RoleKey = 'owner' | 'doctor' | 'receptionist' | 'manager'
 type WorkSurface = 'assistant' | 'calendar' | 'form' | 'list' | 'search' | 'reports' | 'hub'
@@ -103,21 +104,21 @@ const FEATURE_PAGES: Record<RoleKey, Record<string, FeaturePage>> = {
   },
   receptionist: {
     'booking-calendar': {
-      title: 'Booking Calendar',
+      title: 'Manage Booking Slots',
       eyebrow: 'Front desk',
-      description: 'View the day schedule, available slots, booked slots, and appointment status from one work area.',
-      workArea: 'The booking calendar and slot list will appear here when this page is connected.',
-      later: 'Reuse existing slots and booking endpoints from the employee admin workflow.',
+      description: 'Generate, save, review, and update available or blocked appointment slots for the selected day.',
+      workArea: 'Use the connected controls below to manage the clinic slot schedule.',
+      later: 'This page reuses the protected slot endpoints from the employee admin workflow.',
       icon: CalendarCheck,
       surface: 'calendar',
       primaryAction: 'Load calendar',
     },
     'manual-booking-creation': {
-      title: 'Manual Booking Creation',
+      title: 'Manage Bookings',
       eyebrow: 'Front desk',
-      description: 'Create patient bookings from the staff workspace with the same clear flow used by the public booking page.',
-      workArea: 'A staff booking form will be placed here.',
-      later: 'Connect service, date, available slot, patient details, and booking save endpoints.',
+      description: 'Load, filter, update, and delete patient bookings from one focused front-desk workspace.',
+      workArea: 'Use the connected controls below to manage current bookings.',
+      later: 'This page reuses the protected booking endpoints from the employee admin workflow.',
       icon: FileText,
       surface: 'form',
       primaryAction: 'Create booking',
@@ -413,7 +414,15 @@ function HubSurface({ page, icon: Icon }: { page: FeaturePage; icon: LucideIcon 
   )
 }
 
-function FeatureWorkSurface({ page, slug }: { page: FeaturePage; slug: string }) {
+function FeatureWorkSurface({ page, role, slug }: { page: FeaturePage; role: string; slug: string }) {
+  if (role === 'receptionist' && slug === 'booking-calendar') {
+    return <EmployeeAdminPage embeddedSection="slots" />
+  }
+
+  if (role === 'receptionist' && slug === 'manual-booking-creation') {
+    return <EmployeeAdminPage embeddedSection="bookings" />
+  }
+
   if (page.surface === 'assistant') {
     return <AssistantSurface page={page} icon={page.icon} />
   }
@@ -490,7 +499,7 @@ export default function RolePlaceholderPage() {
           <section className="rounded-[1.5rem] bg-white p-6 shadow-card">
             <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-teal-600">Primary work area</p>
             <div className="mt-5">
-              <FeatureWorkSurface page={page} slug={optionSlug} />
+              <FeatureWorkSurface page={page} role={roleSlug} slug={optionSlug} />
             </div>
           </section>
         </div>

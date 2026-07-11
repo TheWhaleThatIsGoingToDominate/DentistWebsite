@@ -64,7 +64,9 @@ employee_admin_router = APIRouter(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://dentist-website-lac-two.vercel.app"
+        "https://dentist-website-lac-two.vercel.app",
+        "http://127.0.0.1:5174",
+        "http://localhost:5174",
     ],
     allow_credentials=True,
     allow_methods=["*"],
