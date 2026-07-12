@@ -1,10 +1,10 @@
 #imports
 import os
 from fastapi import FastAPI, HTTPException, status, Header, Depends, APIRouter
-from logic.authentication import detail_verification, auth, verify_employee_token, delete_employee_token
-from logic.slots import change_status, generate_slots, slots_cleanup, save_slots, load_booking_PBOOKINGPAGE, load_slotsADMINPAGE
-from logic.clientBooking import save_booking, track_booking, cancel_booking
-from logic.adminBooking import load_booking, delete_booking, change_status_of_booking
+from logic.auth.authentication import detail_verification, auth, verify_employee_token, delete_employee_token
+from logic.reception.slots import change_status, generate_slots, slots_cleanup, save_slots, load_booking_PBOOKINGPAGE, load_slotsADMINPAGE
+from logic.publicPageLogic.clientBooking import save_booking, track_booking, cancel_booking
+from logic.reception.adminBooking import load_booking, delete_booking, change_status_of_booking
 from database.main import supabase
 #    ^^^^ new importing method, you can use {name of folder}.name of file to import a certain file
 # that is outside of the folder, but is inside the parent folder
