@@ -258,7 +258,7 @@ def load_bookingADMIN(date: str, role=Depends(require_role("owner", "receptionis
     
 
 @employee_admin_router.get("/slots")
-def load_slotsADMIN(date: str, role=Depends(require_role("owner", "receptionist"))):
+def load_slotsADMIN(date: str, role=Depends(require_role("owner"))):# ,"receptionist"))):
     
     return load_slotsADMINPAGE(date)
 
