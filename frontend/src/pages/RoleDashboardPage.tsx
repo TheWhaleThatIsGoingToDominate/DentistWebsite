@@ -15,9 +15,10 @@ import {
   UsersRound,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { loadEmployeeSession } from '../utils/employeeAccess'
 
 type SupportedRole = 'DOCTOR' | 'OWNER' | 'RECEPTIONIST' | 'MANAGER'
+
+const supportedRoles: SupportedRole[] = ['DOCTOR', 'OWNER', 'RECEPTIONIST', 'MANAGER']
 
 type DashboardItem = {
   title: string
@@ -316,8 +317,23 @@ const ROLE_CONFIG: Record<SupportedRole, RoleConfig> = {
   },
 }
 
+// TEMPORARY TESTING: dashboard navigation keeps the previous token/role query arguments.
+function getRoleFromQuery(value: string | null): SupportedRole | null {
+  if (!value) {
+    return null
+  }
+
+  const normalized = value.toUpperCase()
+  return supportedRoles.includes(normalized as SupportedRole) ? normalized as SupportedRole : null
+}
+
 function dashboardRoute() {
-  return '/role-dashboard'
+  const currentParams = new URLSearchParams(window.location.search)
+  const params = new URLSearchParams({
+    token: currentParams.get('token') ?? '',
+    role: currentParams.get('role') ?? '',
+  })
+  return `/role-dashboard?${params.toString()}`
 }
 
 function slugify(value: string) {
@@ -325,7 +341,9 @@ function slugify(value: string) {
 }
 
 function withPlaceholderRoute(role: SupportedRole, option: string) {
-  return `/role-dashboard/${role.toLowerCase()}/${slugify(option)}`
+  const currentParams = new URLSearchParams(window.location.search)
+  const params = new URLSearchParams({ token: currentParams.get('token') ?? '' })
+  return `/role-dashboard/${role.toLowerCase()}/${slugify(option)}?${params.toString()}`
 }
 
 function AccessState({
@@ -743,17 +761,31 @@ function RoleDashboard({ config }: { config: RoleConfig }) {
 }
 
 export default function RoleDashboardPage() {
-  const session = loadEmployeeSession()
+  // TEMPORARY TESTING: restore dashboard identity from query arguments.
+  const params = new URLSearchParams(window.location.search)
+  const token = params.get('token') ?? ''
+  const rawRole = params.get('role')
+  const role = getRoleFromQuery(rawRole)
 
-  if (!session) {
+  if (!token || !rawRole) {
     return (
       <AccessState
         badge="Access required"
-        title="Sign in to continue"
-        text="This area needs an active employee session. Please open it from the employee login flow."
+        title="Invalid access link"
+        text="This area needs a valid staff access link. Please open it from the employee login flow."
       />
     )
   }
 
-  return <RoleDashboard config={ROLE_CONFIG[session.role]} />
+  if (!role) {
+    return (
+      <AccessState
+        badge="Unauthorized role"
+        title="This role is not supported"
+        text="This staff role is not available for this workspace. Please contact the clinic owner or manager."
+      />
+    )
+  }
+
+  return <RoleDashboard config={ROLE_CONFIG[role]} />
 }

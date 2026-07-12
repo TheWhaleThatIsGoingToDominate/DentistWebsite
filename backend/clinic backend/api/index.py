@@ -74,6 +74,8 @@ def require_role(*roles):
                 status_code=403,
                 detail="forbidden"
             )
+        
+        return employee
     
     return role_auth
 

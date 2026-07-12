@@ -400,6 +400,13 @@ def auth(username, phone_number, password, valid_time: int):
                 raise HTTPException(status_code=500, detail="Employee role is missing")
             role = str(theRole[0]["role"]).upper()
 
+            #valid time authentication
+            if valid_time not in {1, 30, 60, 120, 180}:
+                raise HTTPException(
+                    status_code=401,
+                    detail="unauthoized, time not in options"
+                )
+
             #token creation with expiry time
             token, token_expiry_time= create_token(username, phone_number, valid_time)
 

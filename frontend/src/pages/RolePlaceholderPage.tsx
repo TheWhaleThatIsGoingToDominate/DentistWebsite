@@ -455,6 +455,9 @@ export default function RolePlaceholderPage() {
   const segments = window.location.pathname.split('/').filter(Boolean)
   const roleSlug = segments[1] ?? 'role'
   const optionSlug = segments.slice(2).join('-') || 'workspace'
+  // TEMPORARY TESTING: carry the previous token query argument back to the dashboard.
+  const params = new URLSearchParams(window.location.search)
+  const token = params.get('token') ?? ''
   const session = loadEmployeeSession()
 
   if (!session) {
@@ -481,12 +484,13 @@ export default function RolePlaceholderPage() {
   const roleLabel = ROLE_LABELS[sessionRoleSlug as RoleKey]
   const page = getFeaturePage(sessionRoleSlug, optionSlug)
   const Icon = page.icon
+  const dashboardParams = new URLSearchParams({ token, role: session.role })
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f5faf9]">
       <section className="mx-auto w-full max-w-6xl px-5 py-8 lg:px-8 lg:py-10">
         <a
-          href="/role-dashboard"
+          href={`/role-dashboard?${dashboardParams.toString()}`}
           className="inline-flex min-h-11 items-center gap-2 rounded-full border border-teal-100 bg-white px-5 text-sm font-bold text-ink shadow-sm transition hover:border-teal-300 hover:bg-teal-50"
         >
           <ArrowLeft className="h-4 w-4" />
