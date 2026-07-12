@@ -244,7 +244,7 @@ def saveSlots(data: SaveTheSlots, role=Depends(require_role("owner", "receptioni
 
 
 @employee_admin_router.get("/loadBooking")
-def load_bookingADMIN(date: str, role=Depends(require_role("owner", ))):
+def load_bookingADMIN(date: str, role=Depends(require_role("owner", "receptionist"))):
     try:
         
         return load_booking(date)
