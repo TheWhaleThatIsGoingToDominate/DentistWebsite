@@ -428,11 +428,7 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
     })
     setAccessError('')
 
-    const dashboardParams = new URLSearchParams({
-      token: authentication.token,
-      role: authentication.role,
-    })
-    window.location.href = `/role-dashboard?${dashboardParams.toString()}`
+    window.location.href = '/role-dashboard'
   }
 
   const handleGenerateSlots = async () => {

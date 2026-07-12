@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import EmployeeAdminPage from './EmployeeAdminPage'
+import { loadEmployeeSession } from '../utils/employeeAccess'
 
 type RoleKey = 'owner' | 'doctor' | 'receptionist' | 'manager'
 type WorkSurface = 'assistant' | 'calendar' | 'form' | 'list' | 'search' | 'reports' | 'hub'
@@ -454,18 +455,38 @@ export default function RolePlaceholderPage() {
   const segments = window.location.pathname.split('/').filter(Boolean)
   const roleSlug = segments[1] ?? 'role'
   const optionSlug = segments.slice(2).join('-') || 'workspace'
-  const params = new URLSearchParams(window.location.search)
-  const token = params.get('token') ?? ''
-  const roleLabel = roleSlug in ROLE_LABELS ? ROLE_LABELS[roleSlug as RoleKey] : formatSegment(roleSlug)
-  const page = getFeaturePage(roleSlug, optionSlug)
+  const session = loadEmployeeSession()
+
+  if (!session) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#f5faf9] px-5 py-10">
+        <section className="w-full max-w-xl rounded-[1.5rem] bg-white p-8 shadow-soft">
+          <h1 className="font-display text-4xl text-ink">Sign in to continue</h1>
+          <p className="mt-4 leading-7 text-slate-600">This work page needs an active employee session.</p>
+          <a href="/employee-admin" className="mt-7 inline-flex min-h-11 items-center justify-center rounded-full bg-ink px-6 text-sm font-bold text-white">
+            Employee sign in
+          </a>
+        </section>
+      </main>
+    )
+  }
+
+  const sessionRoleSlug = session.role.toLowerCase()
+
+  if (roleSlug !== sessionRoleSlug) {
+    window.location.replace('/role-dashboard')
+    return null
+  }
+
+  const roleLabel = ROLE_LABELS[sessionRoleSlug as RoleKey]
+  const page = getFeaturePage(sessionRoleSlug, optionSlug)
   const Icon = page.icon
-  const dashboardParams = new URLSearchParams({ token, role: roleSlug.toUpperCase() })
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f5faf9]">
       <section className="mx-auto w-full max-w-6xl px-5 py-8 lg:px-8 lg:py-10">
         <a
-          href={`/role-dashboard?${dashboardParams.toString()}`}
+          href="/role-dashboard"
           className="inline-flex min-h-11 items-center gap-2 rounded-full border border-teal-100 bg-white px-5 text-sm font-bold text-ink shadow-sm transition hover:border-teal-300 hover:bg-teal-50"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -499,7 +520,7 @@ export default function RolePlaceholderPage() {
           <section className="rounded-[1.5rem] bg-white p-6 shadow-card">
             <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-teal-600">Primary work area</p>
             <div className="mt-5">
-              <FeatureWorkSurface page={page} role={roleSlug} slug={optionSlug} />
+              <FeatureWorkSurface page={page} role={sessionRoleSlug} slug={optionSlug} />
             </div>
           </section>
         </div>

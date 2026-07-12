@@ -15,6 +15,7 @@ import {
   UsersRound,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { loadEmployeeSession } from '../utils/employeeAccess'
 
 type SupportedRole = 'DOCTOR' | 'OWNER' | 'RECEPTIONIST' | 'MANAGER'
 
@@ -43,8 +44,6 @@ type RoleConfig = {
   practicalPermissions: string[]
   carefulActions?: string[]
 }
-
-const supportedRoles: SupportedRole[] = ['DOCTOR', 'OWNER', 'RECEPTIONIST', 'MANAGER']
 
 const ROLE_CONFIG: Record<SupportedRole, RoleConfig> = {
   DOCTOR: {
@@ -317,27 +316,16 @@ const ROLE_CONFIG: Record<SupportedRole, RoleConfig> = {
   },
 }
 
-function getRoleFromQuery(value: string | null): SupportedRole | null {
-  if (!value) {
-    return null
-  }
-
-  const normalized = value.toUpperCase()
-  return supportedRoles.includes(normalized as SupportedRole) ? normalized as SupportedRole : null
-}
-
-function withAccessQuery(token: string, role: SupportedRole, section: string) {
-  const params = new URLSearchParams({ token, role, section })
-  return `/role-dashboard?${params.toString()}`
+function dashboardRoute() {
+  return '/role-dashboard'
 }
 
 function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 }
 
-function withPlaceholderRoute(token: string, role: SupportedRole, option: string) {
-  const params = new URLSearchParams({ token })
-  return `/role-dashboard/${role.toLowerCase()}/${slugify(option)}?${params.toString()}`
+function withPlaceholderRoute(role: SupportedRole, option: string) {
+  return `/role-dashboard/${role.toLowerCase()}/${slugify(option)}`
 }
 
 function AccessState({
@@ -589,11 +577,11 @@ function RoleServicesSection({ config }: { config: RoleConfig }) {
   )
 }
 
-function RoleWorkSection({ config, token }: { config: RoleConfig; token: string }) {
+function RoleWorkSection({ config }: { config: RoleConfig }) {
   return (
     <section className="mt-6 grid gap-5 lg:grid-cols-2">
       {config.focusPanels.map((item, index) => {
-        const href = withPlaceholderRoute(token, config.role, item.routeTitle ?? item.title)
+        const href = withPlaceholderRoute(config.role, item.routeTitle ?? item.title)
 
         if (config.role === 'DOCTOR' && item.title === 'AI clinical note draft') {
           return <DoctorNoteDraftOption key={item.title} href={href} />
@@ -614,14 +602,14 @@ function RoleWorkSection({ config, token }: { config: RoleConfig; token: string 
   )
 }
 
-function CleanRoleDashboard({ config, token }: { config: RoleConfig; token: string }) {
+function CleanRoleDashboard({ config }: { config: RoleConfig }) {
   const Icon = config.icon
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f5faf9]">
       <aside className="overflow-x-hidden border-b border-teal-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl flex-col items-start gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-          <a href={withAccessQuery(token, config.role, 'overview')} className="flex items-center gap-3">
+          <a href={dashboardRoute()} className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-gold-300">
               <PanelTop className="h-5 w-5" />
             </span>
@@ -634,7 +622,7 @@ function CleanRoleDashboard({ config, token }: { config: RoleConfig; token: stri
             {config.nav.map((item) => (
               <a
                 key={item}
-                href={withAccessQuery(token, config.role, item.toLowerCase())}
+                href={dashboardRoute()}
                 className="shrink-0 rounded-full border border-teal-100 bg-white px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-ink transition hover:border-teal-300 hover:bg-teal-50"
               >
                 {item}
@@ -670,7 +658,7 @@ function CleanRoleDashboard({ config, token }: { config: RoleConfig; token: stri
           </div>
         </div>
 
-        <RoleWorkSection config={config} token={token} />
+        <RoleWorkSection config={config} />
 
         <RoleServicesSection config={config} />
       </section>
@@ -678,14 +666,14 @@ function CleanRoleDashboard({ config, token }: { config: RoleConfig; token: stri
   )
 }
 
-function OwnerDashboard({ config, token }: { config: RoleConfig; token: string }) {
+function OwnerDashboard({ config }: { config: RoleConfig }) {
   const Icon = config.icon
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f5faf9]">
       <aside className="border-b border-teal-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-col items-start gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-          <a href={withAccessQuery(token, config.role, 'overview')} className="flex items-center gap-3">
+          <a href={dashboardRoute()} className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-gold-300">
               <PanelTop className="h-5 w-5" />
             </span>
@@ -725,14 +713,14 @@ function OwnerDashboard({ config, token }: { config: RoleConfig; token: string }
 
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <OwnerEntryCard
-            href={withPlaceholderRoute(token, config.role, 'Employee dashboard')}
+            href={withPlaceholderRoute(config.role, 'Employee dashboard')}
             eyebrow="Employee dashboard"
             title="Review a day's work in minutes."
             text="See employees, review work, manage staff-related actions, and keep the clinic overview in one focused place."
             icon={UserCog}
           />
           <OwnerEntryCard
-            href={withPlaceholderRoute(token, config.role, 'Doctor mode')}
+            href={withPlaceholderRoute(config.role, 'Doctor mode')}
             eyebrow="Doctor mode"
             title="All your needs, in one place."
             text="Open doctor services, clinical documentation, treatment notes, and owner-doctor workflows without cluttering this page."
@@ -746,39 +734,26 @@ function OwnerDashboard({ config, token }: { config: RoleConfig; token: string }
   )
 }
 
-function RoleDashboard({ config, token }: { config: RoleConfig; token: string }) {
+function RoleDashboard({ config }: { config: RoleConfig }) {
   if (config.role === 'OWNER') {
-    return <OwnerDashboard config={config} token={token} />
+    return <OwnerDashboard config={config} />
   }
 
-  return <CleanRoleDashboard config={config} token={token} />
+  return <CleanRoleDashboard config={config} />
 }
 
 export default function RoleDashboardPage() {
-  const params = new URLSearchParams(window.location.search)
-  const token = params.get('token') ?? ''
-  const rawRole = params.get('role')
-  const role = getRoleFromQuery(rawRole)
+  const session = loadEmployeeSession()
 
-  if (!token || !rawRole) {
+  if (!session) {
     return (
       <AccessState
         badge="Access required"
-        title="Invalid access link"
-        text="This area needs a valid staff access link. Please open it from the employee login flow."
+        title="Sign in to continue"
+        text="This area needs an active employee session. Please open it from the employee login flow."
       />
     )
   }
 
-  if (!role) {
-    return (
-      <AccessState
-        badge="Unauthorized role"
-        title="This role is not supported"
-        text="This staff role is not available for this workspace. Please contact the clinic owner or manager."
-      />
-    )
-  }
-
-  return <RoleDashboard config={ROLE_CONFIG[role]} token={token} />
+  return <RoleDashboard config={ROLE_CONFIG[session.role]} />
 }
