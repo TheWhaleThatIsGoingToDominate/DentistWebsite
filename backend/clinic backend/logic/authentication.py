@@ -413,7 +413,9 @@ def auth(username, phone_number, password, valid_time: int):
         #this executes when the username and number are legit, we hash the password with the old salt, and then compare
 
 
-
+#TODO: make role authentication, make the fontend not use query arguments for redirecting to pages
+#todo: make sue that thee is another functtion in the dependencies that vefies the rule, and depends on equie_employee_auth and takes the employee dict fom it, 
+#todo: tkaes *args and verifies if the ole is in *ags.
 
 #older instance of comparing the saved hashed password and the entered password that was hashed
 # if calculated_password == saved_hashed_password:

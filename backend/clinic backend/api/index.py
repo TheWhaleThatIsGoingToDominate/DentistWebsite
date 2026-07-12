@@ -55,6 +55,28 @@ def require_employee_auth(
 
     return employee
 
+
+def require_role(*roles):
+    roles = {str(i).upper() for i in roles}
+
+    def role_auth(employee = Depends(require_employee_auth)):
+        role = employee[0]["role"]
+        if not role:
+            raise HTTPException(
+                status_code=401,
+                detail="unauthorized, no role"
+            )
+        else:
+            role = str(role).upper()
+        
+        if role not in roles:
+            raise HTTPException(
+                status_code=403,
+                detail="forbidden"
+            )
+    
+    return role_auth
+
 employee_admin_router = APIRouter(
     prefix="/employee/admin",
     dependencies=[Depends(require_employee_auth)]
@@ -173,10 +195,11 @@ class GenerateSlotsType(BaseModel):
     endTime: str
     slotLength: int
 @employee_admin_router.post("/generate")
-def bookingTimes(data: GenerateSlotsType, authroization: str | None = Header(default=None)):
+def bookingTimes(data: GenerateSlotsType, authroization: str | None = Header(default=None), role=Depends(require_role("owner", "receptionist"))):
     #you know that   ^ this hinting doesn't work in normal python, but fastapi uses those hints and actually converts them to values
     #using pydantic
     try:
+        
         output = generate_slots(
             data.startTime,
             data.endTime,
@@ -197,7 +220,7 @@ class changeStatus(BaseModel):
     status: str
 #    VVVVV patch is used when we want to change a part of the frontend, but put changes everything, not a specific part
 @employee_admin_router.patch("/changeState")
-def changeState(Slot: changeStatus):
+def changeState(Slot: changeStatus, role=Depends(require_role("owner", "receptionist"))):
     return change_status(Slot.model_dump())
 
 
@@ -205,8 +228,9 @@ class SaveTheSlots(BaseModel):
     slots: list
     date: str
 @employee_admin_router.post("/saveSlots")
-def saveSlots(data: SaveTheSlots):
+def saveSlots(data: SaveTheSlots, role=Depends(require_role("owner", "receptionist"))):
     try:
+        
         return save_slots(data.date, data.slots)
     except HTTPException:
         raise
@@ -218,8 +242,9 @@ def saveSlots(data: SaveTheSlots):
 
 
 @employee_admin_router.get("/loadBooking")
-def load_bookingADMIN(date: str):
+def load_bookingADMIN(date: str, role=Depends(require_role("owner", "receptionist"))):
     try:
+        
         return load_booking(date)
     except HTTPException:
         raise
@@ -231,15 +256,17 @@ def load_bookingADMIN(date: str):
     
 
 @employee_admin_router.get("/slots")
-def load_slotsADMIN(date: str):
+def load_slotsADMIN(date: str, role=Depends(require_role("owner", "receptionist"))):
+    
     return load_slotsADMINPAGE(date)
 
 class changeBookingStatus(BaseModel):
     status: str
     booking_reference: str
 @employee_admin_router.patch("/booking/status")
-def changingTheStatusOfABooking(data: changeBookingStatus):
+def changingTheStatusOfABooking(data: changeBookingStatus, role=Depends(require_role("owner", "receptionist"))):
     try:
+        
         return change_status_of_booking(
             status= data.status,
             booking_reference= data.booking_reference
@@ -256,7 +283,7 @@ def changingTheStatusOfABooking(data: changeBookingStatus):
 class bookingDeleting(BaseModel):
     booking_reference: str
 @employee_admin_router.delete("/booking/delete")
-def deleteTheBooking(data: bookingDeleting):
+def deleteTheBooking(data: bookingDeleting, role=Depends(require_role("owner", "receptionist"))):
     try:
         return delete_booking(data.booking_reference)
     except HTTPException:
