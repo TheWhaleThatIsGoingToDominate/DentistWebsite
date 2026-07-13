@@ -3,7 +3,7 @@
 #same schedule or the same name
 from fastapi import HTTPException
 from database.main import supabase
-from logic.slots import update_status
+from logic.reception.slots import update_status
 import secrets
 import string
 

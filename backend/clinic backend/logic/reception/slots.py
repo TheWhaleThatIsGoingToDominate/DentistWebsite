@@ -12,7 +12,7 @@ def load_slotsADMINPAGE(date):
         .data
     )
 
-def load_booking_PBOOKINGPAGE(date: str):
+def load_slots_for_booking_PBOOKINGPAGE(date: str):
     return (
         supabase.table("savingTheSlots")
         .select("time")
