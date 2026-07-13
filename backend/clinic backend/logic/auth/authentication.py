@@ -2,12 +2,12 @@ def Authentication(access_key):
     key = "clinic-demo-key"
     return access_key == key
 #   ^^^^^^^^^^^^^^^^^^^^^^^^ new logic
-
-import os
-from cryptography.fernet import Fernet
 from database.main import supabase
 from fastapi import HTTPException
 from datetime import datetime, date
+import os
+from cryptography.fernet import Fernet
+
 #encryption and decryption
 def encryptor(txt:str):
     """
@@ -16,7 +16,6 @@ def encryptor(txt:str):
     the function will return the encrypted txt in the form of 
     the initial key will be in hexadecimal form alright?
     """
-    # key =  "59596b6c44423069323146736f4c6e7a5631564630377751594e5379325355704e645377556b39636758513d"
     key = bytes.fromhex(os.environ.get("SECRET_KEY"))
     cypher_suite = Fernet(key)
 
@@ -34,7 +33,6 @@ def decryptor(encrypted_txt: str): #the string provided is a hexadecimal
     """
 
     #preparing the key and the encryptor
-    # key =  "59596b6c44423069323146736f4c6e7a5631564630377751594e5379325355704e645377556b39636758513d"
     key = bytes.fromhex(os.environ.get("SECRET_KEY"))
     cypher_suite = Fernet(key)
 
@@ -75,8 +73,7 @@ def password_verifier(thePassword: str, username: str, phone_number: str):
     saved_salt = (
         supabase.table("employees")
         .select("salt")
-        .eq("username", username)
-        .eq("phone_number", phone_number)
+        .eq("employee_lookup", employee_lookup(username, phone_number))
         .execute()
         .data
     )
@@ -90,8 +87,7 @@ def password_verifier(thePassword: str, username: str, phone_number: str):
     saved_hashed_password = (
         supabase.table("employees")
         .select("password_hash")
-        .eq("username", username)
-        .eq("phone_number", phone_number)
+        .eq("employee_lookup", employee_lookup(username, phone_number))
         .execute()
         .data
     )
@@ -118,8 +114,8 @@ def password_verifier(thePassword: str, username: str, phone_number: str):
 #token maker for each visit on the employee admin page
 #token system
 import uuid
-from datetime import datetime, date, timedelta, timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, timezone
+
 def create_token(username: str, phone_number: str, valid_time: int): #helper function for auth
     """
     create a token for each visitor on the admin page.
@@ -146,8 +142,7 @@ def create_token(username: str, phone_number: str, valid_time: int): #helper fun
             "token_creation_time":token_creation_time.isoformat(), 
             "token_expiry_time":token_expiry_time.isoformat()
             })
-        .eq("username", username)
-        .eq("phone_number", phone_number)
+        .eq("employee_lookup", employee_lookup(username, phone_number))
         .execute()
     )
 
@@ -176,13 +171,12 @@ def verify_employee_token(username: str, phone_number: str, token: str): #findin
             "valid_time": None,
             "token_creation_time": None,
             "token_expiry_time": None,
-        }).eq("username", username).eq("phone_number", phone_number).execute() 
+        }).eq("employee_lookup", employee_lookup(username, phone_number)).execute() 
     
     TheEmployee = (
         supabase.table("employees")
         .select("*")
-        .eq("username", username)
-        .eq("phone_number", phone_number)
+        .eq("employee_lookup", employee_lookup(username, phone_number))
         .execute()
         .data
     )
@@ -260,8 +254,7 @@ def delete_employee_token(username: str, phone_number: str, token: str):
     theToken = (
         supabase.table("employees")
         .select("hashed_token, token_salt")
-        .eq("username", username)
-        .eq("phone_number", phone_number)
+        .eq("employee_lookup", employee_lookup(username, phone_number))
         .execute()
         .data
     )
@@ -292,8 +285,7 @@ def delete_employee_token(username: str, phone_number: str, token: str):
             "token_creation_time":None, 
             "token_expiry_time":None
             })
-        .eq("username", username)
-        .eq("phone_number", phone_number)
+        .eq("employee_lookup", employee_lookup(username, phone_number))
         .execute()
     )
 
@@ -305,7 +297,11 @@ def delete_employee_token(username: str, phone_number: str, token: str):
 
 
 
-
+import hmac, hashlib
+def employee_lookup(username: str, phone_number: str):
+    employee_lookup = str(username.lower().strip() + "|" + phone_number.strip()).encode("utf-8")
+    employee_lookup = hmac.new(bytes.fromhex(os.environ.get("SECRET_KEY")), employee_lookup, hashlib.sha256) #is in bytes, need to convert it to hex
+    return employee_lookup.hexdigest()
 
 #checkers that check if the entered phone number and username are available on a specific person
 def username_and_phonenumber_verifier(username: str, phone_number: str): #helper function, not indenpendent
@@ -324,17 +320,20 @@ def username_and_phonenumber_verifier(username: str, phone_number: str): #helper
         )
     
 
-
     employee = (
     supabase.table("employees")
     .select("username, phone_number")
-    .eq("username", username)
-    .eq("phone_number", phone_number)
+    .eq("employee_lookup", employee_lookup(username, phone_number))
     .execute()
     .data
 )
-
-    return bool(employee)
+    if not employee:
+        raise HTTPException(
+            status_code=401,
+            detail="unauthorized"
+        )
+    
+    return employee[0]
 
 def detail_verification(username: str, phone_number:str): #independent
     username = username.strip()
@@ -361,14 +360,14 @@ def detail_verification(username: str, phone_number:str): #independent
     employee = (
     supabase.table("employees")
     .select("username, phone_number")
-    .eq("username", username)
-    .eq("phone_number", phone_number)
+    .eq("employee_lookup", employee_lookup(username, phone_number))
     .execute()
     .data
 )
-
+    
     if employee:
-        response["matched_employee"] = True
+        if employee[0]:
+            response["matched_employee"] = True
     
     return response
 
@@ -390,8 +389,7 @@ def auth(username, phone_number, password, valid_time: int):
             theRole = (
                 supabase.table("employees")
                 .select("role")
-                .eq("username", username)
-                .eq("phone_number", phone_number)
+                .eq("employee_lookup", employee_lookup(username, phone_number))
                 .execute().data
             )
             if not theRole:
