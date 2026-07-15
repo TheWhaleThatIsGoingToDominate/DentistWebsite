@@ -204,10 +204,19 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
 
   const loadBookings = useCallback(async () => {
     setBookingsError('')
+
+    const normalizedSearch = bookingSearch.trim()
+
+    if (!normalizedSearch) {
+      setBookings([])
+      setBookingsError('Enter a patient name or phone number.')
+      return
+    }
+
     setIsLoadingBookings(true)
 
     try {
-      const loadedBookings = await fetchBookingsFromBackend(bookingDateFilter || selectedDate)
+      const loadedBookings = await fetchBookingsFromBackend(normalizedSearch)
       setBookings(loadedBookings)
     } catch {
       setBookings([])
@@ -215,7 +224,7 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
     } finally {
       setIsLoadingBookings(false)
     }
-  }, [bookingDateFilter, selectedDate])
+  }, [bookingSearch])
 
   useEffect(() => {
     if (hasAccess) {
@@ -286,12 +295,6 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
       ignoreResponse = true
     }
   }, [hasAccess, selectedDate, setSlotsForDate])
-
-  useEffect(() => {
-    if (hasAccess && activeSection === 'bookings') {
-      loadBookings()
-    }
-  }, [activeSection, hasAccess, loadBookings])
 
   useEffect(() => {
     setEmployeePassword('')

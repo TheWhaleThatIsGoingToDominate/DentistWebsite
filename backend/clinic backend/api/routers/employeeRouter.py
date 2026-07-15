@@ -1,6 +1,6 @@
 from fastapi import HTTPException, status, Header, Depends, APIRouter
 from logic.reception.slots import change_status, generate_slots, save_slots, load_slotsADMINPAGE
-from logic.reception.adminBooking import load_booking, delete_booking, change_status_of_booking
+from logic.reception.adminBooking import load_patient_history, delete_booking, change_status_of_booking
 from api.dependencyFunctions import require_employee_auth, require_role
 from pydantic import BaseModel
 #employe admin page, all related things
@@ -63,10 +63,10 @@ def saveSlots(data: SaveTheSlots, role=Depends(require_role("owner", "receptioni
 
 
 @router.get("/loadBooking")
-def load_bookingADMIN(date: str, role=Depends(require_role("owner", "receptionist"))):
+def load_bookingADMIN(name: str | None = None , phone_number: str | None = None , role=Depends(require_role("owner", "receptionist"))):
     try:
         
-        return load_booking(date)
+        return load_patient_history(name, phone_number)
     except HTTPException:
         raise
     except Exception as e:

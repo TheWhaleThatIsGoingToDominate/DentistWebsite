@@ -205,8 +205,18 @@ export async function updateSlotStatusInBackend(
   return readJsonResponse<UpdateSlotStatusResponse>(response)
 }
 
-export async function fetchBookingsFromBackend(date: string): Promise<BookingRecord[]> {
-  const searchParams = new URLSearchParams({ date })
+export async function fetchBookingsFromBackend(search: string): Promise<BookingRecord[]> {
+  const normalizedSearch = search.trim()
+
+  if (!normalizedSearch) {
+    throw new Error('Enter a patient name or phone number.')
+  }
+
+  const searchParams = new URLSearchParams(
+    /^\d+$/.test(normalizedSearch)
+      ? { phone_number: normalizedSearch }
+      : { name: normalizedSearch },
+  )
   const response = await fetch(`${SCHEDULE_API_BASE_URL}/employee/admin/loadBooking?${searchParams.toString()}`, {
     method: 'GET',
     headers: getEmployeeAdminHeaders(),

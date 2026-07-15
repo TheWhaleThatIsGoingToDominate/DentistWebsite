@@ -16,6 +16,9 @@ def encryptor(txt:str):
     the function will return the encrypted txt in the form of 
     the initial key will be in hexadecimal form alright?
     """
+    if txt is None:
+        return None
+
     key = bytes.fromhex(os.environ.get("SECRET_KEY"))
     cypher_suite = Fernet(key)
 
@@ -31,6 +34,9 @@ def decryptor(encrypted_txt: str): #the string provided is a hexadecimal
     decrypt the txt to the original message
     takes: encrypted_txt: bytes -> txt: bytes -> original txt by decoding 
     """
+
+    if encrypted_txt is None:
+        return None
 
     #preparing the key and the encryptor
     key = bytes.fromhex(os.environ.get("SECRET_KEY"))

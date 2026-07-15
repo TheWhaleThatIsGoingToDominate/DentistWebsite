@@ -50,7 +50,7 @@ class Booking(BaseModel):
     service: str
     date: str
     appointment_time: str
-    notes: str
+    notes: str | None = None
 @router.post("/booking/save")
 def saveBooking(data: Booking):
     try:
