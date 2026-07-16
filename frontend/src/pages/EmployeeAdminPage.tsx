@@ -442,12 +442,7 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
     })
     setAccessError('')
 
-    // TEMPORARY TESTING: restore the previous token/role query-string redirect.
-    const dashboardParams = new URLSearchParams({
-      token: authentication.token,
-      role: authentication.role,
-    })
-    window.location.href = `/role-dashboard?${dashboardParams.toString()}`
+    window.location.href = '/role-dashboard'
   }
 
   const handleGenerateSlots = async () => {
