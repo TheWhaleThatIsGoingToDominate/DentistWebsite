@@ -143,7 +143,11 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
   const [employeePhoneNumber, setEmployeePhoneNumber] = useState('')
   const [employeePassword, setEmployeePassword] = useState('')
   const [tokenDuration, setTokenDuration] = useState<number | ''>('')
-  const [accessError, setAccessError] = useState('')
+  const [accessError, setAccessError] = useState(() =>
+    new URLSearchParams(window.location.search).get('session') === 'expired'
+      ? 'Your session expired. Sign in again to continue.'
+      : '',
+  )
   const [identityVerification, setIdentityVerification] = useState<EmployeeIdentityVerificationResponse | null>(null)
   const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false)
   const [identityVerificationError, setIdentityVerificationError] = useState('')
@@ -422,11 +426,18 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
       return
     }
 
+    if (!authentication.expires_at || Number.isNaN(Date.parse(authentication.expires_at))) {
+      setAccessError('The session expiry time is missing or invalid.')
+      setHasAccess(false)
+      return
+    }
+
     saveEmployeeSession({
       username: trimmedUsername,
       phone_number: trimmedPhoneNumber,
       token: authentication.token,
       tokenDuration,
+      expires_at: authentication.expires_at,
       role: authentication.role,
     })
     setAccessError('')

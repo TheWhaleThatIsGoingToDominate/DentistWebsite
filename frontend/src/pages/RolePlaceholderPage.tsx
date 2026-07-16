@@ -16,6 +16,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import EmployeeAdminPage from './EmployeeAdminPage'
 import { loadEmployeeSession } from '../utils/employeeAccess'
+import SessionExpiryCountdown from '../components/SessionExpiryCountdown'
 
 type RoleKey = 'owner' | 'doctor' | 'receptionist' | 'manager'
 type WorkSurface = 'assistant' | 'calendar' | 'form' | 'list' | 'search' | 'reports' | 'hub'
@@ -489,13 +490,16 @@ export default function RolePlaceholderPage() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f5faf9]">
       <section className="mx-auto w-full max-w-6xl px-5 py-8 lg:px-8 lg:py-10">
-        <a
-          href={`/role-dashboard?${dashboardParams.toString()}`}
-          className="inline-flex min-h-11 items-center gap-2 rounded-full border border-teal-100 bg-white px-5 text-sm font-bold text-ink shadow-sm transition hover:border-teal-300 hover:bg-teal-50"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to {roleLabel} dashboard
-        </a>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <a
+            href={`/role-dashboard?${dashboardParams.toString()}`}
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-teal-100 bg-white px-5 text-sm font-bold text-ink shadow-sm transition hover:border-teal-300 hover:bg-teal-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to {roleLabel} dashboard
+          </a>
+          <SessionExpiryCountdown />
+        </div>
 
         <div className="mt-6 rounded-[1.75rem] bg-white p-6 shadow-soft sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">

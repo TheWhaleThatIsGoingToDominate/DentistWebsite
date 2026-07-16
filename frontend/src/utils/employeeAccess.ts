@@ -10,6 +10,7 @@ export type EmployeeRole = 'DOCTOR' | 'OWNER' | 'RECEPTIONIST' | 'MANAGER'
 export type EmployeeAuthenticationResponse = {
   allowed?: boolean
   token?: string
+  expires_at?: string
   role?: EmployeeRole
 }
 
@@ -18,6 +19,7 @@ export type EmployeeSession = {
   phone_number: string
   token: string
   tokenDuration: number
+  expires_at: string
   role: EmployeeRole
 }
 
@@ -54,6 +56,8 @@ function isEmployeeSession(value: unknown): value is EmployeeSession {
     typeof session.phone_number === 'string' &&
     typeof session.token === 'string' &&
     typeof session.tokenDuration === 'number' &&
+    typeof session.expires_at === 'string' &&
+    !Number.isNaN(Date.parse(session.expires_at)) &&
     isEmployeeRole(session.role)
   )
 }
