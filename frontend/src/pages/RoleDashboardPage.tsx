@@ -637,21 +637,7 @@ function CleanRoleDashboard({ config }: { config: RoleConfig }) {
               <p className="text-[10px] font-extrabold uppercase tracking-[0.26em] text-teal-600">Clinic platform</p>
             </div>
           </a>
-          <div className="flex w-full min-w-0 max-w-full gap-2 overflow-x-auto pb-1 sm:w-auto sm:pb-0">
-            <SessionExpiryCountdown />
-            {config.nav.map((item) => (
-              <a
-                key={item}
-                href={dashboardRoute()}
-                className="shrink-0 rounded-full border border-teal-100 bg-white px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-ink transition hover:border-teal-300 hover:bg-teal-50"
-              >
-                {item}
-              </a>
-            ))}
-            <a href="#your-services" className="shrink-0 rounded-full border border-teal-100 bg-white px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-ink transition hover:border-teal-300 hover:bg-teal-50">
-              Your Services
-            </a>
-          </div>
+          <SessionExpiryCountdown />
         </div>
       </aside>
 
@@ -702,12 +688,7 @@ function OwnerDashboard({ config }: { config: RoleConfig }) {
               <p className="text-[10px] font-extrabold uppercase tracking-[0.26em] text-teal-600">Clinic platform</p>
             </div>
           </a>
-          <div className="flex flex-wrap items-center gap-3">
-            <SessionExpiryCountdown />
-            <a href="#your-services" className="shrink-0 rounded-full border border-teal-100 bg-white px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-ink transition hover:border-teal-300 hover:bg-teal-50">
-              Your Services
-            </a>
-          </div>
+          <SessionExpiryCountdown />
         </div>
       </aside>
 

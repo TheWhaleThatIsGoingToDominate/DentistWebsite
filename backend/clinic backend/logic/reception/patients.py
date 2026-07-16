@@ -18,7 +18,7 @@ def patient_lookup(name: str | None = None, phone_number: str | None = None, fla
         name_lookup = hmac.new(bytes.fromhex(os.environ.get("SECRET_KEY")), name_lookup, hashlib.sha256)
         phone_number_lookup = str(phone_number).encode("utf-8")
         phone_number_lookup = hmac.new(bytes.fromhex(os.environ.get("SECRET_KEY")), phone_number_lookup, hashlib.sha256)
-        return name_lookup.hexdigest(), phone_number_lookup.hexdigest(), patient_lookup.hexdigest()
+        return name_lookup.hexdigest(), phone_number_lookup.hexdigest(), patient_lookup.hexdigest() 
     elif not phone_number and name:
         name_lookup = str(name).encode("utf-8")
         name_lookup = hmac.new(bytes.fromhex(os.environ.get("SECRET_KEY")), name_lookup, hashlib.sha256)

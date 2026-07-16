@@ -53,10 +53,10 @@ export default function SessionExpiryCountdown() {
 
   return (
     <div
-      className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-teal-100 bg-white px-4 py-2 text-xs font-bold text-ink shadow-sm"
+      className="inline-flex min-h-12 w-[232px] max-w-full shrink-0 items-center justify-center gap-3 rounded-full border border-teal-100 bg-white px-6 py-3 text-sm font-bold text-ink shadow-sm"
       title={`Session expires at ${new Date(session.expires_at).toLocaleTimeString()}`}
     >
-      <Clock3 className="h-4 w-4 text-teal-600" />
+      <Clock3 className="h-5 w-5 text-teal-600" />
       <span className="text-slate-500">Session</span>
       <time dateTime={session.expires_at} className="tabular-nums">
         {formatRemainingTime(remainingSeconds)}
