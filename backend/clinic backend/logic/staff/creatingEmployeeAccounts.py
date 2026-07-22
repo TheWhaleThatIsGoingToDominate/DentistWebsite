@@ -78,7 +78,7 @@ def create_account(name: str, phone_number: str, role:str):
                 "activation_code_hash":hashed_code,
                 "activation_code_salt":code_salt,
                 "account_lookup":employee_lookup(name, phone_number),
-                "name":encryptor(name),
+                "username":encryptor(name),
                 "phone_number":encryptor(phone_number),
                 "role":role.upper(),
                 "status":"pending_activation".upper(),
