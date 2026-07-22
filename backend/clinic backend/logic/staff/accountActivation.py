@@ -8,7 +8,7 @@ def activate_account(name: str, phone_number: str, activation_code: str):
     account_lookup = employee_lookup(name, phone_number)
     account = (
         supabase.table("account_activation")
-        .select("account_id, usdrname, phone_number, role, activation_code_hash, activation_code_salt, code_expiry_time")
+        .select("account_id, username, phone_number, role, activation_code_hash, activation_code_salt, code_expiry_time")
         .eq("account_lookup", account_lookup)
         .execute()
         .data
