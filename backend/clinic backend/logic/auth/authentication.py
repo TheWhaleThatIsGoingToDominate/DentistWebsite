@@ -106,7 +106,39 @@ def password_verifier(thePassword: str, username: str, phone_number: str):
 
     calculated_password: bytes = hashlib.pbkdf2_hmac("sha256", str(thePassword).encode(), saved_salt, 100000)
     return compare_digest(saved_hashed_password, calculated_password)
-    
+
+
+def activcation_code_verifier(thePassword: str, username: str, phone_number: str):
+    saved_salt = (
+        supabase.table("account_activation")
+        .select("activation_code_salt")
+        .eq("account_lookup", employee_lookup(username, phone_number))
+        .execute()
+        .data
+    )
+    if not saved_salt:
+        raise HTTPException(
+            status_code=500,
+            detail= "saved_salt is empty"
+        )
+    saved_salt = bytes.fromhex(str(saved_salt[0]["activation_code_salt"]))
+
+    saved_hashed_password = (
+        supabase.table("account_activation")
+        .select("activation_code_hash")
+        .eq("account_lookup", employee_lookup(username, phone_number))
+        .execute()
+        .data
+    )
+    if not saved_hashed_password:
+        raise HTTPException(
+            status_code=500,
+            detail= "saved_hashed_password is empty"
+        )
+    saved_hashed_password = bytes.fromhex(str(saved_hashed_password[0]["activation_code_hash"]))
+
+    calculated_password: bytes = hashlib.pbkdf2_hmac("sha256", str(thePassword).encode(), saved_salt, 100000)
+    return compare_digest(saved_hashed_password, calculated_password)
 
 
 
@@ -121,6 +153,13 @@ def password_verifier(thePassword: str, username: str, phone_number: str):
 #token system
 import uuid
 from datetime import datetime, timedelta, timezone
+def create_setup_token(valid_time: int): 
+    token = str(uuid.uuid4()) #create token
+    token_creation_time= datetime.now(timezone.utc) #gather the time where the token was created
+    token_expiry_time = token_creation_time + timedelta(minutes=valid_time)
+    hashed_token , token_salt = create_new_hash_forpassword_or_token(token) #hash token, obtain its salt
+
+    return token, token_expiry_time.isoformat(), token_creation_time.isoformat(), hashed_token, token_salt
 
 def create_token(username: str, phone_number: str, valid_time: int): #helper function for auth
     """
@@ -154,7 +193,8 @@ def create_token(username: str, phone_number: str, valid_time: int): #helper fun
 
     return token, token_expiry_time.isoformat()
 
-def token_hash_verifier(hashed_token: str, token_salt: str, theToken: str): #helper function
+def token_hash_verifier(hashed_token: str, token_salt: str, theToken: str): 
+    #helper function, will be used in verification of employee token system and setup token system
     try:
         theToken = str(theToken).encode()
         hashed_token = bytes.fromhex(hashed_token)

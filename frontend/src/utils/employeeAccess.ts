@@ -97,7 +97,9 @@ export async function authenticateEmployeeAccess(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      ...credentials,
+      username: credentials.username,
+      phone_number: credentials.phone_number,
+      password: credentials.password,
       valid_time: credentials.tokenDuration,
     }),
   })

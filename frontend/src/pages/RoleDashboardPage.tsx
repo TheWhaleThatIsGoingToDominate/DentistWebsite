@@ -398,6 +398,36 @@ function OwnerEntryCard({
   )
 }
 
+function EmployeeAccountsEntryCard() {
+  return (
+    <a
+      href="/role-dashboard/owner/employee-accounts"
+      className="group relative mt-6 block w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-ink p-6 text-white shadow-card transition duration-300 hover:-translate-y-0.5 hover:border-gold-300/50 hover:bg-[#1a4a4d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-200 sm:p-8"
+    >
+      <UsersRound className="absolute -right-6 -top-8 h-36 w-36 text-white/5 transition duration-300 group-hover:text-gold-300/10" />
+      <div className="relative max-w-3xl">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/10 text-gold-300">
+            <UsersRound className="h-6 w-6" />
+          </span>
+          <span className="rounded-full border border-gold-300/35 bg-white/5 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.12em] text-gold-300">
+            Owner
+          </span>
+        </div>
+        <p className="mt-6 text-xs font-extrabold uppercase tracking-[0.18em] text-white">Owner workspace</p>
+        <h2 className="mt-3 font-display text-3xl leading-tight text-gold-300 sm:text-4xl">Employee accounts</h2>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-white/70">
+          Create employee access and keep account management in one focused owner workspace.
+        </p>
+        <span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-white">
+          Open accounts
+          <ArrowRight className="h-4 w-4 text-gold-300 transition group-hover:translate-x-1" />
+        </span>
+      </div>
+    </a>
+  )
+}
+
 function DoctorNoteDraftOption({ href }: { href: string }) {
   return (
     <a
@@ -713,6 +743,8 @@ function OwnerDashboard({ config }: { config: RoleConfig }) {
             icon={Stethoscope}
           />
         </div>
+
+        <EmployeeAccountsEntryCard />
 
         <OwnerServicesSection config={config} />
       </section>

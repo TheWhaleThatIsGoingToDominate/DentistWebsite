@@ -14,6 +14,10 @@ import BookingPage from './pages/BookingPage'
 import BookingConfirmationPage from './pages/BookingConfirmationPage'
 import BookingStatusPage from './pages/BookingStatusPage'
 import EmployeeAdminPage from './pages/EmployeeAdminPage'
+import EmployeeAccountActivationPage from './pages/EmployeeAccountActivationPage'
+import EmployeeAccountsPage from './pages/EmployeeAccountsPage'
+import CreateEmployeeAccountPage from './pages/CreateEmployeeAccountPage'
+import ManageEmployeeAccountsPage from './pages/ManageEmployeeAccountsPage'
 import RoleDashboardPage from './pages/RoleDashboardPage'
 import RolePlaceholderPage from './pages/RolePlaceholderPage'
 
@@ -472,10 +476,42 @@ export default function App() {
     )
   }
 
+  if (route === '/employee-account/activate') {
+    return (
+      <ScheduleProvider>
+        <EmployeeAccountActivationPage />
+      </ScheduleProvider>
+    )
+  }
+
   if (route === '/role-dashboard') {
     return (
       <ScheduleProvider>
         <RoleDashboardPage />
+      </ScheduleProvider>
+    )
+  }
+
+  if (route === '/role-dashboard/owner/employee-accounts') {
+    return (
+      <ScheduleProvider>
+        <EmployeeAccountsPage />
+      </ScheduleProvider>
+    )
+  }
+
+  if (route === '/role-dashboard/owner/employee-accounts/create') {
+    return (
+      <ScheduleProvider>
+        <CreateEmployeeAccountPage />
+      </ScheduleProvider>
+    )
+  }
+
+  if (route === '/role-dashboard/owner/employee-accounts/manage') {
+    return (
+      <ScheduleProvider>
+        <ManageEmployeeAccountsPage />
       </ScheduleProvider>
     )
   }

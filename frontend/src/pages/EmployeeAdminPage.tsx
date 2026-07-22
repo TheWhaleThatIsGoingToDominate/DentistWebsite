@@ -701,6 +701,9 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
           >
             Enter
           </button>
+          <p className="mt-4 text-center text-xs text-slate-500">
+            Click <a href="/employee-account/activate" className="font-bold text-teal-700 underline decoration-teal-300 underline-offset-4 transition hover:text-ink">here</a> to activate your account.
+          </p>
           {accessError && (
             <p role="alert" className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
               {accessError}
