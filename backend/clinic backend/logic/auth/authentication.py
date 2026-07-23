@@ -349,6 +349,14 @@ def employee_lookup(username: str, phone_number: str):
     employee_lookup = hmac.new(bytes.fromhex(os.environ.get("SECRET_KEY")), employee_lookup, hashlib.sha256) #is in bytes, need to convert it to hex
     return employee_lookup.hexdigest()
 
+def name_lookup(username: str):
+    username_lookup = hmac.new(bytes.fromhex(os.environ.get("SECRET_KEY")), username.encode(), hashlib.sha256)
+    return username_lookup.hexdigest()
+
+def phone_number_lookup(phone_number: str):
+    phonenumber_lookup = hmac.new(bytes.fromhex(os.environ.get("SECRET_KEY")), phone_number.encode(), hashlib.sha256)
+    return phonenumber_lookup.hexdigest()
+
 #checkers that check if the entered phone number and username are available on a specific person
 def username_and_phonenumber_verifier(username: str, phone_number: str): #helper function, not indenpendent
     username = username.strip()

@@ -1,6 +1,6 @@
 from database.main import supabase
 from fastapi import HTTPException
-from logic.auth.authentication import employee_lookup, create_setup_token, create_new_hash_forpassword_or_token, token_hash_verifier, encryptor
+from logic.auth.authentication import employee_lookup, name_lookup, phone_number_lookup,  create_setup_token, create_new_hash_forpassword_or_token, token_hash_verifier, encryptor
 from datetime import datetime, timezone
 
 def activate_account(name: str, phone_number: str, activation_code: str):
@@ -118,7 +118,9 @@ def add_credentials(old_username: str, old_phone_number: str, setup_token: str, 
             detail="invalid input, password is empty"
         )
     
-    
+    #input normalization
+    new_username = new_username.lower().strip()
+    new_phone_number = new_phone_number.strip()
 
 
     #generating employee lookup code
@@ -235,6 +237,8 @@ def add_credentials(old_username: str, old_phone_number: str, setup_token: str, 
             "salt":new_password_salt,
             "employee_id":employee_id,
             "employee_lookup":employee_lookup(new_username, new_phone_number),
+            "name_lookup":name_lookup(new_username),
+            "phone_number_lookup":phone_number_lookup(new_phone_number),
             "role":new_role,
             "is_active":True
         })

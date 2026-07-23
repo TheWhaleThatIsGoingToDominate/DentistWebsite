@@ -1,6 +1,6 @@
 from database.main import supabase
 from fastapi import HTTPException
-from logic.auth.authentication import encryptor, employee_lookup, create_new_hash_forpassword_or_token
+from logic.auth.authentication import encryptor, employee_lookup, name_lookup, phone_number_lookup,  create_new_hash_forpassword_or_token
 import secrets, string, uuid
 from datetime import datetime, timedelta, timezone
 
@@ -43,7 +43,7 @@ def create_account(name: str, phone_number: str, role:str):
     code_expiry_time = code_creation_time + timedelta(minutes=30)
 
     #creating an ID for the employee
-    id = str(uuid.uuid4())
+    id = "ID-" + str(uuid.uuid4())
 
     #creating employee_lookup
     account_lookup = employee_lookup(name, phone_number)
@@ -78,6 +78,8 @@ def create_account(name: str, phone_number: str, role:str):
                 "activation_code_hash":hashed_code,
                 "activation_code_salt":code_salt,
                 "account_lookup":employee_lookup(name, phone_number),
+                "name_lookup":name_lookup(name),
+                "phone_number_lookup":phone_number_lookup(phone_number),
                 "username":encryptor(name),
                 "phone_number":encryptor(phone_number),
                 "role":role.upper(),
