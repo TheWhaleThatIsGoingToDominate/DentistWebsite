@@ -21,10 +21,10 @@ def save_booking(name: str, phone_number, service, date, appointment_time, notes
     if update_status(date, appointment_time) == {"updated":True}:
         try:
             #generating random 8 digit code, that will be the booking_reference
-            alphabetAndNumbers = string.ascii_letters + string.digits
+            char = string.ascii_letters + string.digits + "!@#$&?%"
             theCode = ""
             for _ in range(8):
-                theCode += secrets.choice(alphabetAndNumbers)
+                theCode += secrets.choice(char)
             
             name_lookup, phone_number_lookup, patient__lookup = patient_lookup(name, phone_number, True)
             key = {

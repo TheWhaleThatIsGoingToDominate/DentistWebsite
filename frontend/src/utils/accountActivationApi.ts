@@ -4,11 +4,20 @@ export type ActivateEmployeeAccountRequest = {
   activation_code: string
 }
 
-export type ActivateEmployeeAccountResponse = {
-  verified: boolean
+type VerifiedEmployeeAccountResponse = {
+  verified: true
   setup_token: string
   setup_token_expires_at: string
 }
+
+export type ActivateEmployeeAccountResponse =
+  | (VerifiedEmployeeAccountResponse & {
+      flow: 'ACTIVATION'
+    })
+  | (VerifiedEmployeeAccountResponse & {
+      flow: 'REACTIVATION'
+      reactivation_id: string
+    })
 
 export type AddEmployeeCredentialsRequest = {
   old_username: string
@@ -22,6 +31,20 @@ export type AddEmployeeCredentialsRequest = {
 
 export type AddEmployeeCredentialsResponse = {
   activated: boolean
+}
+
+export type RenewEmployeePasswordRequest = {
+  reactivation_id: string
+  setup_token: string
+  new_password: string
+  password_confirmation: string
+}
+
+export type RenewEmployeePasswordResponse = {
+  reactivated: true
+  employee_id: string
+  employee_status: 'ACTIVE'
+  reactivation_status: 'COMPLETED'
 }
 
 const ACCOUNT_ACTIVATION_BASE_URL = 'https://clinic-auth.vercel.app'
@@ -39,8 +62,10 @@ export class AccountActivationRequestError extends Error {
 function getFallbackMessage(status: number) {
   if (status === 400) return 'The submitted account details are invalid.'
   if (status === 401) return 'The activation details or temporary setup token are invalid or expired.'
+  if (status === 404) return 'The employee account could not be found.'
   if (status === 409) return 'The selected username and phone number are already in use.'
   if (status === 422) return 'Some required account information is missing or invalid.'
+  if (status === 429) return 'Too many incorrect attempts. Ask the clinic owner for a new code.'
   return 'The account setup request could not be completed.'
 }
 
@@ -98,4 +123,18 @@ export async function addEmployeeCredentials(
   })
 
   return readResponse<AddEmployeeCredentialsResponse>(response)
+}
+
+export async function renewEmployeePassword(
+  request: RenewEmployeePasswordRequest,
+): Promise<RenewEmployeePasswordResponse> {
+  const response = await fetch(`${ACCOUNT_ACTIVATION_BASE_URL}/employee/account/reactivation/credentials`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  })
+
+  return readResponse<RenewEmployeePasswordResponse>(response)
 }

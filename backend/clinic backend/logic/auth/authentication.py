@@ -62,7 +62,10 @@ import hashlib
 from hmac import compare_digest
 
 def create_new_hash_forpassword_or_token(thePassword: str): #will be used when creating a new account
-    
+    """
+    hash anything and output the hash and its salt.
+            output: -> hash, salt
+    """
     #hashing
     saved_salt = os.urandom(16)
     hashed_password = hashlib.pbkdf2_hmac(
@@ -153,7 +156,9 @@ def activcation_code_verifier(thePassword: str, username: str, phone_number: str
 #token system
 import uuid
 from datetime import datetime, timedelta, timezone
-def create_setup_token(valid_time: int): 
+def create_setup_token(valid_time: int):
+    """
+    output: -> token, token_expiry_time, token_creation_time, hashed_token, token_salt"""
     token = str(uuid.uuid4()) #create token
     token_creation_time= datetime.now(timezone.utc) #gather the time where the token was created
     token_expiry_time = token_creation_time + timedelta(minutes=valid_time)
@@ -211,18 +216,23 @@ def token_hash_verifier(hashed_token: str, token_salt: str, theToken: str):
 
 def verify_employee_token(username: str, phone_number: str, token: str): #finding the token for the website
     def clear_employee_token_fields(username: str, phone_number: str):
-        supabase.table("employees").update({
-            "hashed_token": None,
-            "token_salt": None,
-            "valid_time": None,
-            "token_creation_time": None,
-            "token_expiry_time": None,
-        }).eq("employee_lookup", employee_lookup(username, phone_number)).execute() 
+        (
+            supabase.table("employees").update({
+                "hashed_token": None,
+                "token_salt": None,
+                "valid_time": None,
+                "token_creation_time": None,
+                "token_expiry_time": None,
+            })
+            .eq("employee_lookup", employee_lookup(username, phone_number))
+            .execute()
+        )
     
     TheEmployee = (
         supabase.table("employees")
         .select("*")
         .eq("employee_lookup", employee_lookup(username, phone_number))
+        .eq("is_active", True)
         .execute()
         .data
     )
@@ -378,6 +388,7 @@ def username_and_phonenumber_verifier(username: str, phone_number: str): #helper
     supabase.table("employees")
     .select("username, phone_number")
     .eq("employee_lookup", employee_lookup(username, phone_number))
+    .eq("is_active", True)
     .execute()
     .data
 )

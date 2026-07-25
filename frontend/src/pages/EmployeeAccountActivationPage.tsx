@@ -12,6 +12,7 @@ import {
   AccountActivationRequestError,
   activateEmployeeAccount,
   addEmployeeCredentials,
+  renewEmployeePassword,
 } from '../utils/accountActivationApi'
 import {
   authenticateEmployeeAccess,
@@ -19,12 +20,21 @@ import {
   saveEmployeeSession,
 } from '../utils/employeeAccess'
 
-type OnboardingHandoff = {
+type OnboardingHandoffBase = {
   old_username: string
   old_phone_number: string
   setup_token: string
   setup_token_expires_at: string
 }
+
+type OnboardingHandoff =
+  | (OnboardingHandoffBase & {
+      flow: 'ACTIVATION'
+    })
+  | (OnboardingHandoffBase & {
+      flow: 'REACTIVATION'
+      reactivation_id: string
+    })
 
 type RestoredHandoff = {
   handoff: OnboardingHandoff | null
@@ -54,7 +64,15 @@ function readStoredHandoff(): RestoredHandoff {
       typeof handoff.old_username === 'string' &&
       typeof handoff.old_phone_number === 'string' &&
       typeof handoff.setup_token === 'string' &&
-      typeof handoff.setup_token_expires_at === 'string'
+      typeof handoff.setup_token_expires_at === 'string' &&
+      (
+        handoff.flow === 'ACTIVATION' ||
+        (
+          handoff.flow === 'REACTIVATION' &&
+          typeof handoff.reactivation_id === 'string' &&
+          handoff.reactivation_id.length > 0
+        )
+      )
     const expiryTime = isComplete ? Date.parse(handoff.setup_token_expires_at as string) : Number.NaN
 
     if (!isComplete || Number.isNaN(expiryTime) || expiryTime <= Date.now()) {
@@ -121,13 +139,19 @@ export default function EmployeeAccountActivationPage() {
     employeePhonePattern.test(normalizedOldPhone) &&
     activationCode.trim().length > 0
   const passwordsMatch = password.length > 0 && password === passwordConfirmation
+  const isReactivation = handoff?.flow === 'REACTIVATION'
   const areCredentialsValid =
-    normalizedNewUsername.length > 0 &&
-    !/\s/.test(normalizedNewUsername) &&
-    employeePhonePattern.test(normalizedNewPhone) &&
-    workHours.trim().length > 0 &&
     passwordsMatch &&
-    tokenDuration !== ''
+    tokenDuration !== '' &&
+    (
+      isReactivation ||
+      (
+        normalizedNewUsername.length > 0 &&
+        !/\s/.test(normalizedNewUsername) &&
+        employeePhonePattern.test(normalizedNewPhone) &&
+        workHours.trim().length > 0
+      )
+    )
 
   const handleActivation = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -144,16 +168,32 @@ export default function EmployeeAccountActivationPage() {
         activation_code: activationCode.trim(),
       })
 
-      if (!response.verified || !response.setup_token || Number.isNaN(Date.parse(response.setup_token_expires_at))) {
+      if (
+        !response.verified ||
+        !response.setup_token ||
+        Number.isNaN(Date.parse(response.setup_token_expires_at)) ||
+        (response.flow !== 'ACTIVATION' && response.flow !== 'REACTIVATION') ||
+        (response.flow === 'REACTIVATION' && !response.reactivation_id)
+      ) {
         throw new Error('The backend returned an invalid setup-token response.')
       }
 
-      const nextHandoff: OnboardingHandoff = {
-        old_username: normalizedOldUsername,
-        old_phone_number: normalizedOldPhone,
-        setup_token: response.setup_token,
-        setup_token_expires_at: response.setup_token_expires_at,
-      }
+      const handoffBase: OnboardingHandoffBase = {
+          old_username: normalizedOldUsername,
+          old_phone_number: normalizedOldPhone,
+          setup_token: response.setup_token,
+          setup_token_expires_at: response.setup_token_expires_at,
+        }
+      const nextHandoff: OnboardingHandoff = response.flow === 'REACTIVATION'
+        ? {
+            ...handoffBase,
+            flow: 'REACTIVATION',
+            reactivation_id: response.reactivation_id,
+          }
+        : {
+            ...handoffBase,
+            flow: 'ACTIVATION',
+          }
 
       saveHandoff(nextHandoff)
       setHandoff(nextHandoff)
@@ -181,18 +221,38 @@ export default function EmployeeAccountActivationPage() {
     setIsSubmitting(true)
 
     try {
-      const credentialsResponse = await addEmployeeCredentials({
-        old_username: handoff.old_username,
-        old_phone_number: handoff.old_phone_number,
-        new_username: normalizedNewUsername,
-        new_phone_number: normalizedNewPhone,
-        new_password: password,
-        password_confirmation: passwordConfirmation,
-        setup_token: handoff.setup_token,
-      })
+      const loginUsername = handoff.flow === 'REACTIVATION'
+        ? handoff.old_username
+        : normalizedNewUsername
+      const loginPhoneNumber = handoff.flow === 'REACTIVATION'
+        ? handoff.old_phone_number
+        : normalizedNewPhone
 
-      if (!credentialsResponse.activated) {
-        throw new Error('The backend did not confirm account activation.')
+      if (handoff.flow === 'REACTIVATION') {
+        const reactivationResponse = await renewEmployeePassword({
+          reactivation_id: handoff.reactivation_id,
+          setup_token: handoff.setup_token,
+          new_password: password,
+          password_confirmation: passwordConfirmation,
+        })
+
+        if (!reactivationResponse.reactivated) {
+          throw new Error('The backend did not confirm account reactivation.')
+        }
+      } else {
+        const credentialsResponse = await addEmployeeCredentials({
+          old_username: handoff.old_username,
+          old_phone_number: handoff.old_phone_number,
+          new_username: normalizedNewUsername,
+          new_phone_number: normalizedNewPhone,
+          new_password: password,
+          password_confirmation: passwordConfirmation,
+          setup_token: handoff.setup_token,
+        })
+
+        if (!credentialsResponse.activated) {
+          throw new Error('The backend did not confirm account activation.')
+        }
       }
 
       clearHandoff()
@@ -200,8 +260,8 @@ export default function EmployeeAccountActivationPage() {
 
       try {
         const authentication = await authenticateEmployeeAccess({
-          username: normalizedNewUsername,
-          phone_number: normalizedNewPhone,
+          username: loginUsername,
+          phone_number: loginPhoneNumber,
           password,
           tokenDuration,
         })
@@ -217,8 +277,8 @@ export default function EmployeeAccountActivationPage() {
         }
 
         saveEmployeeSession({
-          username: normalizedNewUsername,
-          phone_number: normalizedNewPhone,
+          username: loginUsername,
+          phone_number: loginPhoneNumber,
           token: authentication.token,
           tokenDuration,
           expires_at: authentication.expires_at,
@@ -304,7 +364,9 @@ export default function EmployeeAccountActivationPage() {
             <h1 className="mt-3 font-display text-5xl text-ink sm:text-6xl">Welcome!</h1>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-500">
               {isCredentialsStep
-                ? 'Choose the credentials you will use for secure employee access.'
+                ? isReactivation
+                  ? 'Choose a new password to restore secure employee access.'
+                  : 'Choose the credentials you will use for secure employee access.'
                 : 'Verify the pending account created for you by the clinic owner.'}
             </p>
           </div>
@@ -379,51 +441,57 @@ export default function EmployeeAccountActivationPage() {
             <form onSubmit={handleCredentials} className="relative mt-7 space-y-5 rounded-[1.5rem] border border-teal-100 bg-[#f5faf9] p-5 sm:p-7">
               <div>
                 <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-teal-600">Step two</p>
-                <h2 className="mt-2 font-display text-3xl text-ink">Add credentials</h2>
+                <h2 className="mt-2 font-display text-3xl text-ink">
+                  {isReactivation ? 'Reset password' : 'Add credentials'}
+                </h2>
               </div>
-              <label className="form-label">
-                New username
-                <input
-                  className="form-input"
-                  type="text"
-                  value={newUsername}
-                  onChange={(event) => {
-                    setNewUsername(event.target.value.replace(/\s/g, ''))
-                    setError('')
-                  }}
-                  autoComplete="username"
-                  required
-                />
-              </label>
-              <label className="form-label">
-                New phone number
-                <input
-                  className="form-input"
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={11}
-                  value={newPhoneNumber}
-                  onChange={(event) => {
-                    setNewPhoneNumber(event.target.value)
-                    setError('')
-                  }}
-                  placeholder="01xxxxxxxxx"
-                  autoComplete="tel"
-                  required
-                />
-              </label>
-              <label className="form-label">
-                Work hours
-                <input
-                  className="form-input"
-                  type="text"
-                  value={workHours}
-                  onChange={(event) => setWorkHours(event.target.value)}
-                  placeholder="Sunday to Thursday, 9 AM to 5 PM"
-                  required
-                />
-                <span className="normal-case tracking-normal text-slate-400">Required for this form. Work hours are not saved yet.</span>
-              </label>
+              {!isReactivation && (
+                <>
+                  <label className="form-label">
+                    New username
+                    <input
+                      className="form-input"
+                      type="text"
+                      value={newUsername}
+                      onChange={(event) => {
+                        setNewUsername(event.target.value.replace(/\s/g, ''))
+                        setError('')
+                      }}
+                      autoComplete="username"
+                      required
+                    />
+                  </label>
+                  <label className="form-label">
+                    New phone number
+                    <input
+                      className="form-input"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={11}
+                      value={newPhoneNumber}
+                      onChange={(event) => {
+                        setNewPhoneNumber(event.target.value)
+                        setError('')
+                      }}
+                      placeholder="01xxxxxxxxx"
+                      autoComplete="tel"
+                      required
+                    />
+                  </label>
+                  <label className="form-label">
+                    Work hours
+                    <input
+                      className="form-input"
+                      type="text"
+                      value={workHours}
+                      onChange={(event) => setWorkHours(event.target.value)}
+                      placeholder="Sunday to Thursday, 9 AM to 5 PM"
+                      required
+                    />
+                    <span className="normal-case tracking-normal text-slate-400">Required for this form. Work hours are not saved yet.</span>
+                  </label>
+                </>
+              )}
               <label className="form-label">
                 Password
                 <input
@@ -464,11 +532,15 @@ export default function EmployeeAccountActivationPage() {
                   ))}
                 </select>
               </label>
-              <StatusMessage tone="neutral">Work hours stay on this page only until backend support is added.</StatusMessage>
+              {!isReactivation && (
+                <StatusMessage tone="neutral">Work hours stay on this page only until backend support is added.</StatusMessage>
+              )}
               {error && <StatusMessage tone="error">{error}</StatusMessage>}
               <button type="submit" disabled={!areCredentialsValid || isSubmitting} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-ink px-6 text-sm font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50">
                 {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isSubmitting ? 'Activating account...' : 'Activate and sign in'}
+                {isSubmitting
+                  ? isReactivation ? 'Reactivating account...' : 'Activating account...'
+                  : isReactivation ? 'Reactivate and sign in' : 'Activate and sign in'}
               </button>
             </form>
           )}

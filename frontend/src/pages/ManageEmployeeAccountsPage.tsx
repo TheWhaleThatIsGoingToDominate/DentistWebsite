@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   AlertCircle,
   ArrowLeft,
+  Check,
   Clock3,
+  Copy,
   Info,
   Loader2,
   RefreshCw,
@@ -14,6 +16,7 @@ import {
 } from 'lucide-react'
 import OwnerAccountsPageShell from '../components/OwnerAccountsPageShell'
 import {
+  deactivateEmployeeAccount,
   EmployeeAccountsRequestError,
   loadCreatedEmployeeAccounts,
   loadCreatedEmployeeProfile,
@@ -21,6 +24,7 @@ import {
   loadPendingEmployeeProfile,
   type CreatedAccountListItem,
   type CreatedAccountProfile,
+  type DeactivateEmployeeAccountResponse,
   type ManagedEmployeeAccountRole,
   type PendingAccountListItem,
   type PendingAccountProfile,
@@ -184,7 +188,45 @@ function DisabledAction({
   )
 }
 
-function AccountDetails({ account, onBack }: { account: AccountPreview; onBack: () => void }) {
+function DeactivateAction({
+  isLoading,
+  onClick,
+}: {
+  isLoading: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={isLoading}
+      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-5 text-sm font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-wait disabled:opacity-60"
+    >
+      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserRoundX className="h-4 w-4" />}
+      {isLoading ? 'Deactivating...' : 'Deactivate account'}
+    </button>
+  )
+}
+
+function AccountDetails({
+  account,
+  onBack,
+  onDeactivate,
+  isDeactivating,
+  deactivationResult,
+  deactivationError,
+  hasCopiedCode,
+  onCopyCode,
+}: {
+  account: AccountPreview
+  onBack: () => void
+  onDeactivate: () => void
+  isDeactivating: boolean
+  deactivationResult: DeactivateEmployeeAccountResponse | null
+  deactivationError: string
+  hasCopiedCode: boolean
+  onCopyCode: () => void
+}) {
   const isCreated = account.tab === 'created'
   const isInactive = account.status === 'INACTIVE'
   const activationExpiry = formatExpiry(account.activation_expires_at)
@@ -242,11 +284,11 @@ function AccountDetails({ account, onBack }: { account: AccountPreview; onBack: 
           {isCreated ? (
             <>
               <DisabledAction label="Update role or details" icon={UserRoundCog} />
-              <DisabledAction
-                label={isInactive ? 'Reactivate account' : 'Deactivate account'}
-                icon={UserRoundX}
-                tone={isInactive ? 'standard' : 'danger'}
-              />
+              {isInactive ? (
+                <DisabledAction label="Reactivate account" icon={UserRoundX} />
+              ) : (
+                <DeactivateAction isLoading={isDeactivating} onClick={onDeactivate} />
+              )}
             </>
           ) : (
             <>
@@ -255,6 +297,34 @@ function AccountDetails({ account, onBack }: { account: AccountPreview; onBack: 
             </>
           )}
         </div>
+        {deactivationError && (
+          <p className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700" role="alert">
+            {deactivationError}
+          </p>
+        )}
+        {deactivationResult && (
+          <div className="mt-4 rounded-2xl border border-gold-200 bg-[#fff9e8] p-4" role="status">
+            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-gold-600">
+              Reactivation code
+            </p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <code className="min-w-0 flex-1 break-all rounded-xl bg-white px-4 py-3 text-base font-bold text-ink">
+                {deactivationResult.reactivation_code}
+              </code>
+              <button
+                type="button"
+                onClick={onCopyCode}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink px-5 text-sm font-bold text-white transition hover:bg-teal-700"
+              >
+                {hasCopiedCode ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {hasCopiedCode ? 'Copied' : 'Copy code'}
+              </button>
+            </div>
+            <p className="mt-3 text-xs font-semibold text-slate-500">
+              Expires: {formatExpiry(deactivationResult.code_expires_at) ?? 'Unavailable'}
+            </p>
+          </div>
+        )}
       </section>
     </div>
   )
@@ -324,6 +394,10 @@ export default function ManageEmployeeAccountsPage() {
   const [selectedAccount, setSelectedAccount] = useState<AccountPreview | null>(null)
   const [isProfileLoading, setIsProfileLoading] = useState(false)
   const [profileError, setProfileError] = useState<Error | null>(null)
+  const [isDeactivating, setIsDeactivating] = useState(false)
+  const [deactivationResult, setDeactivationResult] = useState<DeactivateEmployeeAccountResponse | null>(null)
+  const [deactivationError, setDeactivationError] = useState('')
+  const [hasCopiedCode, setHasCopiedCode] = useState(false)
   const profileRequestId = useRef(0)
 
   const loadAccounts = useCallback(async (tab: AccountTab) => {
@@ -360,6 +434,9 @@ export default function ManageEmployeeAccountsPage() {
     setSelectedAccount(null)
     setProfileError(null)
     setIsProfileLoading(true)
+    setDeactivationResult(null)
+    setDeactivationError('')
+    setHasCopiedCode(false)
 
     try {
       const response = target.tab === 'created'
@@ -387,6 +464,70 @@ export default function ManageEmployeeAccountsPage() {
     setSelectedAccount(null)
     setProfileError(null)
     setIsProfileLoading(false)
+    setIsDeactivating(false)
+    setDeactivationResult(null)
+    setDeactivationError('')
+    setHasCopiedCode(false)
+  }
+
+  const handleDeactivate = async () => {
+    if (
+      !selectedAccount ||
+      selectedAccount.tab !== 'created' ||
+      selectedAccount.status !== 'ACTIVE' ||
+      isDeactivating
+    ) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Deactivate ${selectedAccount.username}? They will be signed out and will need the new reactivation code to regain access.`,
+    )
+
+    if (!confirmed) return
+
+    setIsDeactivating(true)
+    setDeactivationError('')
+    setDeactivationResult(null)
+    setHasCopiedCode(false)
+
+    try {
+      const result = await deactivateEmployeeAccount(selectedAccount.id)
+
+      if (result.employee_id !== selectedAccount.id) {
+        throw new Error('The backend returned a different employee account than expected.')
+      }
+
+      setSelectedAccount((current) => (
+        current ? { ...current, status: 'INACTIVE' } : current
+      ))
+      setAccountsByTab((current) => ({
+        ...current,
+        created: current.created.map((account) => (
+          account.id === result.employee_id ? { ...account, status: 'INACTIVE' } : account
+        )),
+      }))
+      setDeactivationResult(result)
+    } catch (error) {
+      setDeactivationError(
+        error instanceof Error ? error.message : 'The employee account could not be deactivated.',
+      )
+    } finally {
+      setIsDeactivating(false)
+    }
+  }
+
+  const copyReactivationCode = async () => {
+    if (!deactivationResult) return
+
+    try {
+      await navigator.clipboard.writeText(deactivationResult.reactivation_code)
+      setHasCopiedCode(true)
+      setDeactivationError('')
+    } catch {
+      setHasCopiedCode(false)
+      setDeactivationError('The reactivation code could not be copied. Select and copy it manually.')
+    }
   }
 
   const changeTab = (tab: AccountTab) => {
@@ -455,7 +596,16 @@ export default function ManageEmployeeAccountsPage() {
                   />
                 )}
                 {!isProfileLoading && !profileError && selectedAccount && (
-                  <AccountDetails account={selectedAccount} onBack={closeProfile} />
+                  <AccountDetails
+                    account={selectedAccount}
+                    onBack={closeProfile}
+                    onDeactivate={() => void handleDeactivate()}
+                    isDeactivating={isDeactivating}
+                    deactivationResult={deactivationResult}
+                    deactivationError={deactivationError}
+                    hasCopiedCode={hasCopiedCode}
+                    onCopyCode={() => void copyReactivationCode()}
+                  />
                 )}
               </div>
             ) : (

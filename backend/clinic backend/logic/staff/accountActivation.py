@@ -8,7 +8,7 @@ def activate_account(name: str, phone_number: str, activation_code: str):
     account_lookup = employee_lookup(name, phone_number)
     account = (
         supabase.table("account_activation")
-        .select("account_id, username, phone_number, role, activation_code_hash, activation_code_salt, code_expiry_time")
+        .select("account_id, username, phone_number, role, activation_code_hash, activation_code_salt, code_expiry_time, failed_attempts")
         .eq("account_lookup", account_lookup)
         .execute()
         .data
@@ -24,13 +24,39 @@ def activate_account(name: str, phone_number: str, activation_code: str):
     activation_code_hash = account[0]["activation_code_hash"]
     activation_code_salt = account[0]["activation_code_salt"]
     raw_time = account[0]["code_expiry_time"]
+    failed_attempts = account[0]["failed_attempts"]
     #1: checking if the 2 codes match
     try:
         if not token_hash_verifier(activation_code_hash, activation_code_salt, activation_code):
-            raise HTTPException(
-                status_code=401,
-                detail="unauthorized"
-            )
+            failed_attempts += 1
+            if failed_attempts >= 5:
+                (
+                    supabase.table("account_activation")
+                    .update({
+                        "activation_code_hash":None,
+                        "activation_code_salt":None,
+                        "code_expiry_time":None,
+                        "failed_attempts":failed_attempts, 
+                        "status":"REVOKED"
+                    })
+                    .eq("account_lookup", account_lookup)
+                    .execute()
+                )
+                raise HTTPException(
+                    status_code=429,
+                    detail="Too many incorrect attempts. Request a new reactivation code."
+                )
+            else:
+                (
+                    supabase.table("account_activation")
+                    .update({"failed_attempts":failed_attempts})
+                    .eq("account_lookup", account_lookup)
+                    .execute()
+                )
+                raise HTTPException(
+                    status_code=401,
+                    detail="unauthorized, invalid reactivation code"
+                )
     except Exception:
         raise
     #2: checking if the code expired
@@ -71,7 +97,7 @@ def activate_account(name: str, phone_number: str, activation_code: str):
             detail="code expired, access denied"
         )
     
-    #3: revoking the access code while creating the setup token (strongeer design)
+    #3: revoking the access code while creating the setup token (stronger design)
     setup_token, setup_token_expiry_time, setup_token_creation_time, hashed_setup_token, setup_token_salt = create_setup_token(30)
     (
         supabase.table("account_activation")
@@ -82,7 +108,8 @@ def activate_account(name: str, phone_number: str, activation_code: str):
             "setup_token_creation_time":setup_token_creation_time,
             "hashed_setup_token":hashed_setup_token,
             "setup_token_salt":setup_token_salt,
-            "status":"setting_up_credentials".upper()
+            "status":"setting_up_credentials".upper(), 
+            
         })
         .eq("account_lookup", employee_lookup(name, phone_number))
         .execute()

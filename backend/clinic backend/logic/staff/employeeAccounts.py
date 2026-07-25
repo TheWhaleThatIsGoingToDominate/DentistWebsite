@@ -12,6 +12,7 @@ def load_created_accounts(name: str | None = None, phone_number: str | None = No
         response =(
             supabase.table("employees")
             .select("employee_id, username, phone_number, role, is_active")
+            .neq("role", "OWNER")
             .execute().data
         )
     elif name and not phone_number:
@@ -19,6 +20,7 @@ def load_created_accounts(name: str | None = None, phone_number: str | None = No
             supabase.table("employees")
             .select("employee_id, username, phone_number, role, is_active")
             .eq("name_lookup", name_lookup(name))
+            .neq("role", "OWNER")
             .execute().data
             )
     elif phone_number and not name:
@@ -26,6 +28,7 @@ def load_created_accounts(name: str | None = None, phone_number: str | None = No
             supabase.table("employees")
             .select("employee_id, username, phone_number, role, is_active")
             .eq("phone_number_lookup", phone_number_lookup(phone_number))
+            .neq("role", "OWNER")
             .execute().data
         )
     else:
@@ -33,6 +36,7 @@ def load_created_accounts(name: str | None = None, phone_number: str | None = No
             supabase.table("employees")
             .select("employee_id, username, phone_number, role, is_active")
             .eq("employee_lookup", employee_lookup(name, phone_number))
+            .neq("role", "OWNER")
             .execute().data
         )
 
@@ -41,6 +45,8 @@ def load_created_accounts(name: str | None = None, phone_number: str | None = No
         key["phone_number"] = decryptor(key["phone_number"])
 
     return response
+
+
 def load_pending_accounts(name: str | None = None, phone_number: str | None = None):
     #normalization of input
     name = name.lower().strip() if name else None
@@ -91,6 +97,7 @@ def load_created_profile(account_id: str):
     profile = (
         supabase.table("employees")
         .select("username, phone_number, role, employee_id, is_active")
+        .neq("role", "OWNER")
         .eq("employee_id", account_id)
         .execute().data
     )

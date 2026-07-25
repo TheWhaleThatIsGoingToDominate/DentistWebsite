@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from logic.staff.accountActivation import add_credentials, activate_account
+from logic.staff.accountActivation import add_credentials
+from logic.staff.accountAccess import verify_account_location
+from logic.staff.accountReactivation import renew_password
 
 router = APIRouter()
 
@@ -40,10 +42,28 @@ class activateAccount(BaseModel):
 @router.post("/employee/account/activate")
 def activatetheaccount(data: activateAccount):
     try:
-        return activate_account(data.name, data.phone_number, data.activation_code)
+        return verify_account_location(data.name, data.phone_number, data.activation_code)
     except HTTPException:
         raise 
     except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+
+class renewPassword(BaseModel):
+    setup_token: str
+    new_password: str
+    password_confirmation: str
+    reactivation_id: str
+@router.post("/employee/account/reactivation/credentials")
+def renewThePassoword(data: renewPassword):
+    try: 
+        return renew_password(data.reactivation_id, data.setup_token, data.new_password, data.password_confirmation)
+    except HTTPException:
+        raise
+    except Exception as e: 
         raise HTTPException(
             status_code=500,
             detail=str(e)

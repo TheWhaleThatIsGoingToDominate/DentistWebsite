@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from api.dependencyFunctions import require_employee_auth, require_role
 from logic.staff.creatingEmployeeAccounts import create_account, create_activation_code
 from logic.staff.employeeAccounts import load_created_accounts, load_pending_accounts, load_created_profile, load_pending_profile
+from logic.staff.accountReactivation import deactivate_employee
+
 
 router = APIRouter(
     dependencies=[Depends(require_employee_auth)]
@@ -83,3 +85,15 @@ def loadPendingProfile(account_id: str, _=Depends(require_role("owner"))):
             status_code=500,
             detail=str(e)
         )
+
+#! employee account deactivation 
+@router.post("/owner/account/deactivate")
+def deactivateEmployeeAccount(employee_id: str, _=Depends(require_role("owner"))): 
+    try: 
+        return deactivate_employee(employee_id)
+    except HTTPException:
+        raise 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+

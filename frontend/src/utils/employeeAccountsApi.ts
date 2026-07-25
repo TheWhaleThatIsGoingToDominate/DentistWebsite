@@ -65,6 +65,17 @@ export type PendingAccountProfileResponse = {
   account: PendingAccountProfile
 }
 
+export type DeactivateEmployeeAccountResponse = {
+  deactivated: true
+  employee_id: string
+  employee_status: 'INACTIVE'
+  reactivation_created: true
+  reactivation_id: string
+  reactivation_code: string
+  reactivation_status: 'PENDING_VERIFICATION'
+  code_expires_at: string
+}
+
 const EMPLOYEE_ACCOUNTS_BASE_URL = 'https://clinic-auth.vercel.app'
 
 export class EmployeeAccountsRequestError extends Error {
@@ -133,6 +144,8 @@ function getManagementErrorMessage(status: number, payload: unknown) {
   if (status === 401) return 'Your employee session has expired. Sign in again to continue.'
   if (status === 403) return 'Owner access is required to manage employee accounts.'
   if (status === 404) return 'The requested employee account was not found.'
+  if (status === 400 || status === 422) return 'The employee account request is invalid.'
+  if (status === 409) return 'This employee account is already inactive.'
   return 'Employee account information could not be loaded.'
 }
 
@@ -193,6 +206,23 @@ function isPendingAccountProfile(value: unknown): value is PendingAccountProfile
   )
 }
 
+function isDeactivateEmployeeAccountResponse(
+  value: unknown,
+): value is DeactivateEmployeeAccountResponse {
+  if (!isRecord(value)) return false
+
+  return (
+    value.deactivated === true &&
+    typeof value.employee_id === 'string' &&
+    value.employee_status === 'INACTIVE' &&
+    value.reactivation_created === true &&
+    typeof value.reactivation_id === 'string' &&
+    typeof value.reactivation_code === 'string' &&
+    value.reactivation_status === 'PENDING_VERIFICATION' &&
+    typeof value.code_expires_at === 'string'
+  )
+}
+
 function unexpectedResponse(): never {
   throw new EmployeeAccountsRequestError(
     'The backend returned employee account information in an unexpected format.',
@@ -200,7 +230,10 @@ function unexpectedResponse(): never {
   )
 }
 
-async function requestOwnerAccountData(path: string): Promise<unknown> {
+async function requestOwnerAccountData(
+  path: string,
+  method: 'GET' | 'POST' = 'GET',
+): Promise<unknown> {
   const session = loadEmployeeSession()
 
   if (!session || session.role !== 'OWNER') {
@@ -211,6 +244,7 @@ async function requestOwnerAccountData(path: string): Promise<unknown> {
 
   try {
     response = await fetch(`${EMPLOYEE_ACCOUNTS_BASE_URL}${path}`, {
+      method,
       headers: {
         Authorization: `Bearer ${session.token}`,
         'X-Employee-Username': session.username,
@@ -323,4 +357,25 @@ export async function loadPendingEmployeeProfile(
   }
 
   return { account: payload.account }
+}
+
+export async function deactivateEmployeeAccount(
+  employeeId: string,
+): Promise<DeactivateEmployeeAccountResponse> {
+  const normalizedEmployeeId = employeeId.trim()
+
+  if (!normalizedEmployeeId) {
+    throw new EmployeeAccountsRequestError('A valid employee ID is required.', { status: 400 })
+  }
+
+  const payload = await requestOwnerAccountData(
+    `/owner/account/deactivate?employee_id=${encodeURIComponent(normalizedEmployeeId)}`,
+    'POST',
+  )
+
+  if (!isDeactivateEmployeeAccountResponse(payload)) {
+    unexpectedResponse()
+  }
+
+  return payload
 }
