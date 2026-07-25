@@ -48,11 +48,53 @@ def deactivate_employee(employee_id: str):
             .eq("employee_id", employee_id)
             .execute()
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=404,
             detail="could not update is_active as employee_id is not found in the datavbase"
         )
+
+    return {
+        "deactivated": True,
+        "employee_id": employee_id,
+        "employee_status": "INACTIVE"
+    }
+
+
+def reactivate_employee(employee_id: str):
+    profile = (
+        supabase.table("employees")
+        .select("employee_id, username, phone_number, employee_lookup, role, is_active")
+        .eq("employee_id", employee_id)
+        .neq("role", "OWNER")
+        .execute().data
+    )
+    
+    if not profile:
+        raise HTTPException(
+            status_code=404,
+            detail="employee not found"
+        )
+
+    if profile[0]["is_active"]:
+        raise HTTPException(
+            status_code=409,
+            detail="employee is already active"
+        )
+
+    if not profile:
+        raise HTTPException(status_code=404, detail="employee not found")
+
+    #* checking to see if a double request has been made
+    request = (
+        supabase.table("account_reactivation")
+        .select("*")
+        .eq("employee_id", employee_id)
+        .in_("status", ["PENDING_VERIFICATION", "SETTING_UP_CREDENTIALS"])
+        .execute().data
+    )
+    if request:
+        raise HTTPException(status_code=409, detail="a request has already been made")
 
     #* generate unique reactivation_id, hashed otp with expiry and salt
     #reactivation_id
@@ -74,7 +116,7 @@ def deactivate_employee(employee_id: str):
             supabase.table("account_reactivation")
             .insert({
                 "reactivation_id":reactivation_id,
-                "employee_id":profile[0]["employee_id"],
+                "employee_id":employee_id,
                 "employee_lookup":profile[0]["employee_lookup"],
                 "status":"PENDING_VERIFICATION",
                 "reactivation_code_hash":reactivation_code_hash,
@@ -84,12 +126,6 @@ def deactivate_employee(employee_id: str):
             .execute()
         )
     except Exception as e:
-        (
-            supabase.table("employees")
-            .update({"is_active":True})
-            .eq("employee_id", employee_id)
-            .execute()
-        )
         raise HTTPException(
             status_code=500,
             detail="could not insert into 'account_reactivation" + "\n" + str(e)
@@ -98,10 +134,8 @@ def deactivate_employee(employee_id: str):
 
     #* return statement
     return {
-        "deactivated": True,
-        "employee_id": employee_id,
-        "employee_status": "INACTIVE",
         "reactivation_created": True,
+        "employee_id": employee_id,
         "reactivation_id": reactivation_id,
         "reactivation_code": reactivation_code,
         "reactivation_status": "PENDING_VERIFICATION",
@@ -109,8 +143,8 @@ def deactivate_employee(employee_id: str):
     }
 
 
-def reactivate_employee(username: str, phone_number: str, activation_code: str): #! public endpoint
-        #generating employee lookup and comparing it with what is in the database
+def public_reactivate_employee(username: str, phone_number: str, activation_code: str): #! public endpoint
+    #generating employee lookup and comparing it with what is in the database
     employee__lookup = employee_lookup(username, phone_number)
     account = (
         supabase.table("account_reactivation")

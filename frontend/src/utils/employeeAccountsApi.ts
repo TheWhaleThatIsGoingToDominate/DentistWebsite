@@ -45,6 +45,11 @@ export type CreatedAccountProfile = CreatedAccountListItem & {
   status?: string
 }
 
+export type CreatedAccountReactivationState = {
+  status: 'PENDING_VERIFICATION' | 'SETTING_UP_CREDENTIALS'
+  code_expiry_time: string | null
+}
+
 export type PendingAccountProfile = {
   account_id: string
   username: string
@@ -59,6 +64,7 @@ export type PendingAccountProfile = {
 
 export type CreatedAccountProfileResponse = {
   account: CreatedAccountProfile
+  reactivation: CreatedAccountReactivationState | null
 }
 
 export type PendingAccountProfileResponse = {
@@ -69,7 +75,11 @@ export type DeactivateEmployeeAccountResponse = {
   deactivated: true
   employee_id: string
   employee_status: 'INACTIVE'
+}
+
+export type StartEmployeeReactivationResponse = {
   reactivation_created: true
+  employee_id: string
   reactivation_id: string
   reactivation_code: string
   reactivation_status: 'PENDING_VERIFICATION'
@@ -206,6 +216,17 @@ function isPendingAccountProfile(value: unknown): value is PendingAccountProfile
   )
 }
 
+function isCreatedAccountReactivationState(
+  value: unknown,
+): value is CreatedAccountReactivationState {
+  if (!isRecord(value)) return false
+
+  return (
+    (value.status === 'PENDING_VERIFICATION' || value.status === 'SETTING_UP_CREDENTIALS') &&
+    isNullableString(value.code_expiry_time)
+  )
+}
+
 function isDeactivateEmployeeAccountResponse(
   value: unknown,
 ): value is DeactivateEmployeeAccountResponse {
@@ -214,8 +235,18 @@ function isDeactivateEmployeeAccountResponse(
   return (
     value.deactivated === true &&
     typeof value.employee_id === 'string' &&
-    value.employee_status === 'INACTIVE' &&
+    value.employee_status === 'INACTIVE'
+  )
+}
+
+function isStartEmployeeReactivationResponse(
+  value: unknown,
+): value is StartEmployeeReactivationResponse {
+  if (!isRecord(value)) return false
+
+  return (
     value.reactivation_created === true &&
+    typeof value.employee_id === 'string' &&
     typeof value.reactivation_id === 'string' &&
     typeof value.reactivation_code === 'string' &&
     value.reactivation_status === 'PENDING_VERIFICATION' &&
@@ -342,7 +373,17 @@ export async function loadCreatedEmployeeProfile(
     unexpectedResponse()
   }
 
-  return { account: payload.account }
+  if (
+    payload.reactivation !== null &&
+    !isCreatedAccountReactivationState(payload.reactivation)
+  ) {
+    unexpectedResponse()
+  }
+
+  return {
+    account: payload.account,
+    reactivation: payload.reactivation,
+  }
 }
 
 export async function loadPendingEmployeeProfile(
@@ -374,6 +415,27 @@ export async function deactivateEmployeeAccount(
   )
 
   if (!isDeactivateEmployeeAccountResponse(payload)) {
+    unexpectedResponse()
+  }
+
+  return payload
+}
+
+export async function startEmployeeReactivation(
+  employeeId: string,
+): Promise<StartEmployeeReactivationResponse> {
+  const normalizedEmployeeId = employeeId.trim()
+
+  if (!normalizedEmployeeId) {
+    throw new EmployeeAccountsRequestError('A valid employee ID is required.', { status: 400 })
+  }
+
+  const payload = await requestOwnerAccountData(
+    `/owner/account/reactivation/start?employee_id=${encodeURIComponent(normalizedEmployeeId)}`,
+    'POST',
+  )
+
+  if (!isStartEmployeeReactivationResponse(payload)) {
     unexpectedResponse()
   }
 

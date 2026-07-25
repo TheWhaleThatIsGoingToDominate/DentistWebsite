@@ -102,6 +102,19 @@ def load_created_profile(account_id: str):
         .execute().data
     )
 
+    reactivation = (
+        supabase.table("account_reactivation")
+        .select("status, code_expiry_time")
+        .eq("employee_id", account_id)
+        .in_("status", [
+            "PENDING_VERIFICATION",
+            "SETTING_UP_CREDENTIALS"
+        ])
+        .limit(1)
+        .execute()
+        .data
+    )
+
     if not profile:
         raise HTTPException(
             status_code=404,
@@ -112,7 +125,9 @@ def load_created_profile(account_id: str):
         key["username"] = decryptor(key["username"])
         key["phone_number"] = decryptor(key["phone_number"])
 
-    return {"account":profile[0]}
+    return {
+        "account":profile[0],
+        "reactivation":reactivation[0] if reactivation else None}
 
 def load_pending_profile(account_id: str):
     if not account_id:

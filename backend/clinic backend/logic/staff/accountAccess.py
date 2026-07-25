@@ -1,5 +1,5 @@
 from logic.staff.accountActivation import activate_account
-from logic.staff.accountReactivation import reactivate_employee
+from logic.staff.accountReactivation import public_reactivate_employee
 from logic.auth.authentication import employee_lookup
 from database.main import supabase
 from fastapi import HTTPException
@@ -34,7 +34,7 @@ def verify_account_location(username: str, phone_number: str, code: str):
         )
 
     if employee_profile:
-        result = reactivate_employee(username, phone_number, code)
+        result = public_reactivate_employee(username, phone_number, code)
         return {
             **result,
             "flow":"REACTIVATION"
