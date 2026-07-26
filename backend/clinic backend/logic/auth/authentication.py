@@ -294,7 +294,6 @@ def verify_employee_token(username: str, phone_number: str, token: str): #findin
     
     try:
         if not token_hash_verifier(hashed_token, token_salt, token):
-            clear_employee_token_fields(username, phone_number)
             raise HTTPException(
                 status_code=401,
                 detail="Token expired, access denied"
