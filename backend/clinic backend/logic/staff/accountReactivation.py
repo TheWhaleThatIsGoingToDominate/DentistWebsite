@@ -121,7 +121,7 @@ def reactivate_employee(employee_id: str):
                 "status":"PENDING_VERIFICATION",
                 "reactivation_code_hash":reactivation_code_hash,
                 "reactivation_code_salt":reactivation_code_salt,
-                "code_expiry_time":code_expiry_time
+                "code_expiry_time":code_expiry_time.isoformat()
             })
             .execute()
         )
@@ -139,7 +139,7 @@ def reactivate_employee(employee_id: str):
         "reactivation_id": reactivation_id,
         "reactivation_code": reactivation_code,
         "reactivation_status": "PENDING_VERIFICATION",
-        "code_expires_at": code_expiry_time
+        "code_expires_at": code_expiry_time.isoformat()
     }
 
 
