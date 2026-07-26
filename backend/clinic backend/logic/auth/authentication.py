@@ -299,7 +299,6 @@ def verify_employee_token(username: str, phone_number: str, token: str): #findin
                 detail="Token expired, access denied"
             )
     except HTTPException:
-        clear_employee_token_fields(username, phone_number)
         raise
     
     return TheEmployee
