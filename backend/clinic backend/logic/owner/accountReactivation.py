@@ -107,7 +107,7 @@ def reactivate_employee(employee_id: str):
     #hashed otp with salt, expiry
     reactivation_code = "".join([secrets.choice(char) for _ in range(8)])
     reactivation_code_hash, reactivation_code_salt  = create_new_hash_forpassword_or_token(reactivation_code)
-    code_expiry_time = datetime.now(timezone.utc) + timedelta(minutes=30)
+    code_expiry_time = datetime.now(timezone.utc) + timedelta(minutes=5)
 
 
     #* insert a new row into "account_reactivation" using the generated fields: reactivation_id, hashed_otp and all its relations, employee_lookup, and status

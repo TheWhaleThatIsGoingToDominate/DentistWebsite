@@ -40,7 +40,7 @@ def create_account(name: str, phone_number: str, role:str):
         activation_code += secrets.choice(char)
     hashed_code, code_salt = create_new_hash_forpassword_or_token(activation_code)
     code_creation_time = datetime.now(timezone.utc)
-    code_expiry_time = code_creation_time + timedelta(minutes=30)
+    code_expiry_time = code_creation_time + timedelta(minutes=5)
 
     #creating an ID for the employee
     id = "ID-" + str(uuid.uuid4())
