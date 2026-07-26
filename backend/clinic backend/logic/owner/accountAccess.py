@@ -1,5 +1,5 @@
-from logic.staff.accountActivation import activate_account
-from logic.staff.accountReactivation import public_reactivate_employee
+from logic.owner.accountActivation import activate_account
+from logic.owner.accountReactivation import public_reactivate_employee
 from logic.auth.authentication import employee_lookup
 from database.main import supabase
 from fastapi import HTTPException

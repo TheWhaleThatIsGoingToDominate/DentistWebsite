@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from api.dependencyFunctions import require_employee_auth, require_role
-from logic.staff.creatingEmployeeAccounts import create_account, create_activation_code
-from logic.staff.employeeAccounts import load_created_accounts, load_pending_accounts, load_created_profile, load_pending_profile
-from logic.staff.accountReactivation import deactivate_employee, reactivate_employee
+from logic.owner.creatingEmployeeAccounts import create_account, create_activation_code
+from logic.owner.employeeAccounts import load_created_accounts, load_pending_accounts, load_created_profile, load_pending_profile
+from logic.owner.accountReactivation import deactivate_employee, reactivate_employee
 
 
 router = APIRouter(

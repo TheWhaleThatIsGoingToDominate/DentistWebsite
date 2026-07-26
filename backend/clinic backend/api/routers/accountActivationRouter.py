@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from logic.staff.accountActivation import add_credentials
-from logic.staff.accountAccess import verify_account_location
-from logic.staff.accountReactivation import renew_password
+from logic.owner.accountActivation import add_credentials
+from logic.owner.accountAccess import verify_account_location
+from logic.owner.accountReactivation import renew_password
 
 router = APIRouter()
 
