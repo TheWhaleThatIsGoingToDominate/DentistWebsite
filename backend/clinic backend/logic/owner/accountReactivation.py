@@ -240,7 +240,7 @@ def public_reactivate_employee(username: str, phone_number: str, activation_code
         )
     
     #3: revoking the access code while creating the setup token (stronger design)
-    setup_token, setup_token_expiry_time, setup_token_creation_time, hashed_setup_token, setup_token_salt = create_setup_token(30)
+    setup_token, setup_token_expiry_time, setup_token_creation_time, hashed_setup_token, setup_token_salt = create_setup_token(5)
     (
         supabase.table("account_reactivation")
         .update({
