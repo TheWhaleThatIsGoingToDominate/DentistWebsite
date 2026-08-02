@@ -51,4 +51,9 @@ class Logout(BaseModel):
     token: str
 @router.post("/employee/auth/logout")
 def logout(data: Logout): #will use the function that clears the token, salt, and all related things to the token
-    return delete_employee_token(data.username, data.phone_number, data.token)
+    try:
+        return delete_employee_token(data.username, data.phone_number, data.token)
+    except HTTPException:
+        raise 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

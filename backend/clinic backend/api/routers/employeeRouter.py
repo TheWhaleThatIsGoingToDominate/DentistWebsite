@@ -29,12 +29,14 @@ def bookingTimes(data: GenerateSlotsType, authroization: str | None = Header(def
         )
 
         return output
-
+    except HTTPException: raise
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+    except Exception as e:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 class changeStatus(BaseModel):
@@ -43,7 +45,12 @@ class changeStatus(BaseModel):
 #    VVVVV patch is used when we want to change a part of the frontend, but put changes everything, not a specific part
 @router.patch("/changeState")
 def changeState(Slot: changeStatus, role=Depends(require_role("owner", "receptionist"))):
-    return change_status(Slot.model_dump())
+    try: 
+        return change_status(Slot.model_dump())
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 class SaveTheSlots(BaseModel):
@@ -79,8 +86,12 @@ def load_bookingADMIN(name: str | None = None , phone_number: str | None = None 
 
 @router.get("/slots")
 def load_slotsADMIN(date: str, role=Depends(require_role("owner" ,"receptionist"))):
-    
-    return load_slotsADMINPAGE(date)
+    try:
+        return load_slotsADMINPAGE(date)
+    except HTTPException:
+        raise 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 class changeBookingStatus(BaseModel):
     status: str
@@ -118,5 +129,10 @@ def deleteTheBooking(data: bookingDeleting, role=Depends(require_role("owner", "
 
 @router.get("/employee/profile")
 def loadMyProfile(employee=Depends(require_employee_auth)):
-    employee_id = employee[0]["employee_id"]
-    return view_profile(employee_id)
+    try:
+        employee_id = employee[0]["employee_id"]
+        return view_profile(employee_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
