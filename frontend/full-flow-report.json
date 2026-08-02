@@ -1,0 +1,102 @@
+{
+  "generatedAt": "2026-08-02T18:49:25.088Z",
+  "summary": {
+    "passed": 5,
+    "failed": 1,
+    "skipped": 2
+  },
+  "results": [
+    {
+      "section": "Safety",
+      "status": "PASS",
+      "name": "Full-flow safety flags accepted",
+      "details": {
+        "databaseChecks": true,
+        "automaticCleanup": false
+      }
+    },
+    {
+      "section": "Owner authentication",
+      "status": "PASS",
+      "name": "Owner authentication succeeds",
+      "details": {
+        "path": "/employee/auth",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Account creation",
+      "status": "PASS",
+      "name": "Owner creates pending employee account",
+      "details": {
+        "path": "/owner/createAccount",
+        "httpStatus": 201
+      }
+    },
+    {
+      "section": "Account creation",
+      "status": "PASS",
+      "name": "Account activation status is PENDING_VERIFICATION",
+      "details": {
+        "table": "account_activation",
+        "field": "status",
+        "expected": "PENDING_VERIFICATION"
+      }
+    },
+    {
+      "section": "Account creation",
+      "status": "FAIL",
+      "name": "Pending account appears in owner list",
+      "details": {
+        "path": "/owner/accounts/pending",
+        "httpStatus": 500,
+        "error": null,
+        "body": {
+          "detail": "non-hexadecimal number found in fromhex() arg at position 0"
+        },
+        "validationErrors": [],
+        "forbiddenKeys": []
+      }
+    },
+    {
+      "section": "Session cleanup",
+      "status": "SKIP",
+      "name": "Employee logout",
+      "details": {
+        "reason": "No token was created."
+      }
+    },
+    {
+      "section": "Session cleanup",
+      "status": "PASS",
+      "name": "Owner logout",
+      "details": {
+        "path": "/employee/auth/logout",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Manual data cleanup",
+      "status": "SKIP",
+      "name": "Automatic database cleanup is intentionally unavailable",
+      "details": {
+        "reason": "No employee deletion API exists. Remove dependent rows before removing the employee.",
+        "cleanupOrder": [
+          "account_reactivation by reactivation_id or employee_id",
+          "employee_working_hours by employee_id",
+          "account_activation by account_id if the flow stopped before activation",
+          "employees by employee_id"
+        ],
+        "manifest": {
+          "runId": "20260802184919_9bfd0e",
+          "pendingUsername": "aurora_e2e_pending_20260802184919_9bfd0e",
+          "activeUsername": "aurora_e2e_active_20260802184919_9bfd0e",
+          "phoneNumber": "01942361782",
+          "accountId": "ID-a918a84a-418e-4dfa-8958-bbd889b5d93b",
+          "employeeId": null,
+          "reactivationId": null
+        }
+      }
+    }
+  ]
+}
