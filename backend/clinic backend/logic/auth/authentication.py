@@ -47,6 +47,33 @@ def decryptor(encrypted_txt: str): #the string provided is a hexadecimal
 
     #returning orignal txt
     return txt.decode()
+stored_roles = set("doctor, manager, receptionist, owner".upper().split(", "))
+
+def encrypt_employee_role(employee_id: str, role: str):
+    role = role.strip().upper()
+    if role not in stored_roles:
+        raise HTTPException(status_code=400, detail="invalid input")
+
+    encrypted = encryptor(f"{employee_id}|{role}")
+    return encrypted
+
+def decrypt_employee_role(employee_id ,txt):
+    """returns: stored_employee_id, role. It returns the id cause why not?"""
+    try:
+        decrypted_txt= decryptor(txt)
+        stored_employee_id, role = decrypted_txt.split("|",1)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if role not in stored_roles:
+        raise HTTPException(status_code=400, detail="invalid input")
+
+    if not compare_digest(employee_id, stored_employee_id):
+        raise HTTPException(status_code=409, detail="conflict, decrypted employee id does not match passed employee id")\
+
+    return str(role).upper()
+
+
 
 
 
@@ -241,7 +268,8 @@ def verify_employee_token(username: str, phone_number: str, token: str): #findin
             status_code=401,
             detail="access denied"
         )
-    employee: dict =TheEmployee[0]
+    employee: dict = TheEmployee[0]
+    employee["role"] = decrypt_employee_role(employee["employee_id"],employee["role"])
     hashed_token = employee.get("hashed_token")
     token_salt = employee.get("token_salt")
 
@@ -451,15 +479,15 @@ def auth(username, phone_number, password, valid_time: int):
             #role extraction
             theRole = (
                 supabase.table("employees")
-                .select("role")
+                .select("employee_id, role")
                 .eq("employee_lookup", employee_lookup(username, phone_number))
                 .execute().data
             )
             if not theRole:
                 raise HTTPException(status_code=500, detail="Employee role is missing")
-            if not theRole[0].get("role"):
+            if not theRole[0].get("employee_id") or not theRole[0].get("role"):
                 raise HTTPException(status_code=500, detail="Employee role is missing")
-            role = str(theRole[0]["role"]).upper()
+            role = decrypt_employee_role(theRole[0]["employee_id"],theRole[0]["role"]).upper()
 
             #valid time authentication
             if valid_time not in {1, 30, 60, 120, 180}:

@@ -1,6 +1,13 @@
 from database.main import supabase
 from fastapi import HTTPException
-from logic.auth.authentication import encryptor, employee_lookup, name_lookup, phone_number_lookup,  create_new_hash_forpassword_or_token
+from logic.auth.authentication import (
+    encryptor,
+    employee_lookup, 
+    name_lookup, 
+    phone_number_lookup,  
+    create_new_hash_forpassword_or_token,
+    encrypt_employee_role
+    )
 import secrets, string, uuid
 from datetime import datetime, timedelta, timezone
 
@@ -82,8 +89,8 @@ def create_account(name: str, phone_number: str, role:str):
                 "phone_number_lookup":phone_number_lookup(phone_number),
                 "username":encryptor(name),
                 "phone_number":encryptor(phone_number),
-                "role":role.upper(),
-                "status":"pending_activation".upper(),
+                "role": encrypt_employee_role(id, role.upper()),
+                "status":"PENDING_VERIFICATION",
                 "account_id":id, 
                 "code_creation_time":code_creation_time.isoformat(),
                 "code_expiry_time":code_expiry_time.isoformat()
@@ -104,7 +111,7 @@ def create_account(name: str, phone_number: str, role:str):
             "username": name,
             "phone_number": phone_number,
             "role": role.upper(),
-            "status": "PENDING_ACTIVATION"
+            "status": "PENDING_VERIFICATION"
         },
         "activation_code": activation_code,
         "activation_expires_at": code_expiry_time.isoformat()
@@ -148,7 +155,7 @@ def create_activation_code(account_id: str):
             "setup_token_salt": None,
             "setup_token_creation_time": None,
             "setup_token_expiry_time": None,
-            "status": "PENDING_ACTIVATION",
+            "status": "PENDING_VERIFICATION",
             "activation_code_hash":hashed_code,
             "activation_code_salt":code_salt,
             "code_creation_time":code_creation_time.isoformat(),

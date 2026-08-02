@@ -2,7 +2,12 @@ from database.main import supabase
 from fastapi import HTTPException
 import secrets, string
 from datetime import datetime, timezone, timedelta
-from logic.auth.authentication import create_new_hash_forpassword_or_token, create_setup_token, employee_lookup, token_hash_verifier
+from logic.auth.authentication import (
+    create_new_hash_forpassword_or_token, 
+    create_setup_token, 
+    employee_lookup, 
+    token_hash_verifier,
+    decrypt_employee_role)
 
 
 def deactivate_employee(employee_id: str):
@@ -17,7 +22,6 @@ def deactivate_employee(employee_id: str):
         supabase.table("employees")
         .select("employee_id, username, phone_number, employee_lookup, role, is_active")
         .eq("employee_id", employee_id)
-        .neq("role", "OWNER")
         .execute().data
     )
 
@@ -31,6 +35,16 @@ def deactivate_employee(employee_id: str):
         raise HTTPException(
             status_code=409,
             detail="employee already inactive"
+        )
+
+    role = decrypt_employee_role(employee_id, profile[0]["role"])
+    if not role:
+        raise HTTPException(status_code=404, detail="role not found in database")
+
+    if role == "OWNER":
+        raise HTTPException(
+            status_code=403,
+            detail="The owner account cannot be modified"
         )
 
     #* set is_active = False
@@ -66,7 +80,6 @@ def reactivate_employee(employee_id: str):
         supabase.table("employees")
         .select("employee_id, username, phone_number, employee_lookup, role, is_active")
         .eq("employee_id", employee_id)
-        .neq("role", "OWNER")
         .execute().data
     )
     
@@ -84,6 +97,16 @@ def reactivate_employee(employee_id: str):
 
     if not profile:
         raise HTTPException(status_code=404, detail="employee not found")
+
+    role = decrypt_employee_role(employee_id, profile[0]["role"])
+    if not role:
+        raise HTTPException(status_code=404, detail="role not found in database")
+
+    if role == "OWNER":
+        raise HTTPException(
+            status_code=403,
+            detail="The owner account cannot be modified"
+        )
 
     #* checking to see if a double request has been made
     request = (

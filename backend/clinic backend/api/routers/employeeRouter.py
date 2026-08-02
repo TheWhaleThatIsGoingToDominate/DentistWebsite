@@ -2,6 +2,7 @@ from fastapi import HTTPException, status, Header, Depends, APIRouter
 from logic.reception.slots import change_status, generate_slots, save_slots, load_slotsADMINPAGE
 from logic.reception.adminBooking import load_patient_history, delete_booking, change_status_of_booking
 from api.dependencyFunctions import require_employee_auth, require_role
+from logic.employee.viewProfile import view_profile
 from pydantic import BaseModel
 #employe admin page, all related things
 #function that will be used in the router to require a token in each admin action
@@ -114,3 +115,8 @@ def deleteTheBooking(data: bookingDeleting, role=Depends(require_role("owner", "
             status_code=500,
             detail=str(e)
         )
+
+@router.get("/employee/profile")
+def loadMyProfile(employee=Depends(require_employee_auth)):
+    employee_id = employee[0]["employee_id"]
+    return view_profile(employee_id)

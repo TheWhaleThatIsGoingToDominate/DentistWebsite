@@ -1,6 +1,17 @@
 from database.main import supabase
 from fastapi import HTTPException
-from logic.auth.authentication import employee_lookup, name_lookup, phone_number_lookup,  create_setup_token, create_new_hash_forpassword_or_token, token_hash_verifier, encryptor
+from logic.auth.authentication import (
+    employee_lookup, 
+    name_lookup, 
+    phone_number_lookup,  
+    create_setup_token, 
+    create_new_hash_forpassword_or_token, 
+    token_hash_verifier, 
+    encryptor,
+    encrypt_employee_role, 
+    decrypt_employee_role
+    )
+from logic.employee.saveWorkingHours import save_working_hours
 from datetime import datetime, timezone
 
 def activate_account(name: str, phone_number: str, activation_code: str):
@@ -124,7 +135,16 @@ def activate_account(name: str, phone_number: str, activation_code: str):
     }
 
 
-def add_credentials(old_username: str, old_phone_number: str, setup_token: str, new_username: str, new_phone_number: str, new_password: str, password_confirmation: str):
+def add_credentials(
+        old_username: str,
+        old_phone_number: str,
+        setup_token: str,
+        new_username: str,
+        new_phone_number: str,
+        new_password: str,
+        password_confirmation: str, 
+        working_hours: list
+    ):
     #checking any errors
     if " " in old_username or " " in new_username:
         raise HTTPException(
@@ -253,8 +273,11 @@ def add_credentials(old_username: str, old_phone_number: str, setup_token: str, 
         )
 
     employee_id = database_stuff[0]["account_id"]
-    new_role = database_stuff[0]["role"]
+    new_role = decrypt_employee_role(employee_id, database_stuff[0]["role"])
     new_hashed_password, new_password_salt = create_new_hash_forpassword_or_token(new_password)
+
+    
+    
     (
         supabase.table("employees")
         .insert({
@@ -266,11 +289,14 @@ def add_credentials(old_username: str, old_phone_number: str, setup_token: str, 
             "employee_lookup":employee_lookup(new_username, new_phone_number),
             "name_lookup":name_lookup(new_username),
             "phone_number_lookup":phone_number_lookup(new_phone_number),
-            "role":new_role,
+            "role": encrypt_employee_role(employee_id, str(new_role).upper()),
             "is_active":True
         })
         .execute()
     )
+
+    #working hours logic is here, the function already saves the working hours automatically
+    working_hours_result = save_working_hours(working_hours, employee_id)
 
     #deleting the existing pending account in the account_activation table, because it was just activated
     (
@@ -281,5 +307,6 @@ def add_credentials(old_username: str, old_phone_number: str, setup_token: str, 
     )
 
     return {
-        "activated": True
+        "activated": True,
+        "working_hours_saved": working_hours_result["inserted"]
     }

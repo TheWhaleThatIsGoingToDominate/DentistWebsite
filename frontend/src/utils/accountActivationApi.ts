@@ -19,6 +19,13 @@ export type ActivateEmployeeAccountResponse =
       reactivation_id: string
     })
 
+export type WorkingHoursInterval = {
+  day_of_week: number
+  start_minute: number
+  end_minute: number
+  working_status: true
+}
+
 export type AddEmployeeCredentialsRequest = {
   old_username: string
   old_phone_number: string
@@ -27,10 +34,12 @@ export type AddEmployeeCredentialsRequest = {
   new_password: string
   password_confirmation: string
   setup_token: string
+  working_hours: WorkingHoursInterval[]
 }
 
 export type AddEmployeeCredentialsResponse = {
-  activated: boolean
+  activated: true
+  working_hours_saved: true
 }
 
 export type RenewEmployeePasswordRequest = {

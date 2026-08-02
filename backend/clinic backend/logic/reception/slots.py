@@ -122,6 +122,7 @@ def save_slots(date: str, slots: list): #<copied
             .select("*")
             .eq("date", date)
             .eq("time", slot["time"])
+            .neq("status", "booked")
             .execute()
             .data
         )

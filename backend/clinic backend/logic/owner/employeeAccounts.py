@@ -1,5 +1,10 @@
 from database.main import supabase
-from logic.auth.authentication import name_lookup, employee_lookup, phone_number_lookup, decryptor
+from logic.auth.authentication import (
+    name_lookup,
+    employee_lookup, 
+    phone_number_lookup, 
+    decryptor,
+    decrypt_employee_role)
 from fastapi import HTTPException
 
 def load_created_accounts(name: str | None = None, phone_number: str | None = None):
@@ -12,7 +17,6 @@ def load_created_accounts(name: str | None = None, phone_number: str | None = No
         response =(
             supabase.table("employees")
             .select("employee_id, username, phone_number, role, is_active")
-            .neq("role", "OWNER")
             .execute().data
         )
     elif name and not phone_number:
@@ -20,7 +24,6 @@ def load_created_accounts(name: str | None = None, phone_number: str | None = No
             supabase.table("employees")
             .select("employee_id, username, phone_number, role, is_active")
             .eq("name_lookup", name_lookup(name))
-            .neq("role", "OWNER")
             .execute().data
             )
     elif phone_number and not name:
@@ -28,7 +31,6 @@ def load_created_accounts(name: str | None = None, phone_number: str | None = No
             supabase.table("employees")
             .select("employee_id, username, phone_number, role, is_active")
             .eq("phone_number_lookup", phone_number_lookup(phone_number))
-            .neq("role", "OWNER")
             .execute().data
         )
     else:
@@ -36,15 +38,58 @@ def load_created_accounts(name: str | None = None, phone_number: str | None = No
             supabase.table("employees")
             .select("employee_id, username, phone_number, role, is_active")
             .eq("employee_lookup", employee_lookup(name, phone_number))
-            .neq("role", "OWNER")
             .execute().data
         )
 
     for key in response:
+        key["role"] = decrypt_employee_role(key["employee_id"],key["role"])
+        if key["role"] != "OWNER":
+            key["username"] = decryptor(key["username"])
+            key["phone_number"] = decryptor(key["phone_number"])
+    return [element for element in response if element["role"] != "OWNER"]
+
+def load_created_profile(account_id: str):
+    if not account_id:
+        raise HTTPException(
+            status_code=400,
+            detail="invalid input, account_id is empty"
+        )
+
+    profile = (
+        supabase.table("employees")
+        .select("username, phone_number, role, employee_id, is_active")
+        
+        .eq("employee_id", account_id)
+        .execute().data
+    )
+
+    reactivation = (
+        supabase.table("account_reactivation")
+        .select("status, code_expiry_time")
+        .eq("employee_id", account_id)
+        .in_("status", [
+            "PENDING_VERIFICATION",
+            "SETTING_UP_CREDENTIALS"
+        ])
+        .limit(1)
+        .execute()
+        .data
+    )
+
+    if not profile:
+        raise HTTPException(
+            status_code=404,
+            detail="employee not found"
+        )
+
+    for key in profile:
         key["username"] = decryptor(key["username"])
         key["phone_number"] = decryptor(key["phone_number"])
+        key["role"] = decrypt_employee_role(key["employee_id"],key["role"])
 
-    return response
+    return {
+        "account":profile[0],
+        "reactivation":reactivation[0] if reactivation else None}
 
 
 def load_pending_accounts(name: str | None = None, phone_number: str | None = None):
@@ -84,50 +129,10 @@ def load_pending_accounts(name: str | None = None, phone_number: str | None = No
     for key in response:
         key["username"] = decryptor(key["username"])
         key["phone_number"] = decryptor(key["phone_number"])
+        key["role"] = decrypt_employee_role(key["account_id"],key["role"])
 
     return response
 
-def load_created_profile(account_id: str):
-    if not account_id:
-        raise HTTPException(
-            status_code=400,
-            detail="invalid input, account_id is empty"
-        )
-
-    profile = (
-        supabase.table("employees")
-        .select("username, phone_number, role, employee_id, is_active")
-        .neq("role", "OWNER")
-        .eq("employee_id", account_id)
-        .execute().data
-    )
-
-    reactivation = (
-        supabase.table("account_reactivation")
-        .select("status, code_expiry_time")
-        .eq("employee_id", account_id)
-        .in_("status", [
-            "PENDING_VERIFICATION",
-            "SETTING_UP_CREDENTIALS"
-        ])
-        .limit(1)
-        .execute()
-        .data
-    )
-
-    if not profile:
-        raise HTTPException(
-            status_code=404,
-            detail="employee not found"
-        )
-
-    for key in profile:
-        key["username"] = decryptor(key["username"])
-        key["phone_number"] = decryptor(key["phone_number"])
-
-    return {
-        "account":profile[0],
-        "reactivation":reactivation[0] if reactivation else None}
 
 def load_pending_profile(account_id: str):
     if not account_id:
@@ -152,5 +157,6 @@ def load_pending_profile(account_id: str):
     for key in profile:
         key["username"] = decryptor(key["username"])
         key["phone_number"] = decryptor(key["phone_number"])
+        key["role"] = decrypt_employee_role(key["account_id"],key["role"])
 
     return {"account":profile[0]}

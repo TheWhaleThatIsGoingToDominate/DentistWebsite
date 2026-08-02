@@ -13,6 +13,7 @@ import {
   activateEmployeeAccount,
   addEmployeeCredentials,
   renewEmployeePassword,
+  type WorkingHoursInterval,
 } from '../utils/accountActivationApi'
 import {
   authenticateEmployeeAccess,
@@ -50,6 +51,88 @@ const sessionDurationOptions = [
   { label: '2h', value: 120 },
   { label: '3h', value: 180 },
 ]
+const workingDays = [
+  { label: 'Sunday', value: 0 },
+  { label: 'Monday', value: 1 },
+  { label: 'Tuesday', value: 2 },
+  { label: 'Wednesday', value: 3 },
+  { label: 'Thursday', value: 4 },
+  { label: 'Friday', value: 5 },
+  { label: 'Saturday', value: 6 },
+]
+
+type WorkingHoursDraft = {
+  day_of_week: number | ''
+  start_time: string
+  end_time: string
+}
+
+const emptyWorkingHoursRows: WorkingHoursDraft[] = workingDays.map(() => ({
+  day_of_week: '',
+  start_time: '',
+  end_time: '',
+}))
+
+function formatTimeLabel(value: string) {
+  const [rawHours, minutes] = value.split(':').map(Number)
+  const period = rawHours >= 12 ? 'PM' : 'AM'
+  const hours = rawHours % 12 || 12
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${period}`
+}
+
+const timeOptions = Array.from({ length: 48 }, (_, index) => {
+  const hours = Math.floor(index / 2)
+  const minutes = index % 2 === 0 ? 0 : 30
+  const value = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+  return { label: formatTimeLabel(value), value }
+})
+
+function parseTimeToMinutes(value: string) {
+  const match = value.match(/^(\d{2}):(\d{2})$/)
+  if (!match) return null
+
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
+
+  return hours * 60 + minutes
+}
+
+function getWorkingHoursRowError(row: WorkingHoursDraft, rows: WorkingHoursDraft[]) {
+  const hasAnyValue = row.day_of_week !== '' || row.start_time !== '' || row.end_time !== ''
+  if (!hasAnyValue) return ''
+
+  if (row.day_of_week === '' || !row.start_time || !row.end_time) {
+    return 'Select a day, start time, and end time.'
+  }
+
+  const duplicateCount = rows.filter((candidate) => candidate.day_of_week === row.day_of_week).length
+  if (duplicateCount > 1) return 'This day is already selected.'
+
+  const startMinute = parseTimeToMinutes(row.start_time)
+  const endMinute = parseTimeToMinutes(row.end_time)
+  if (startMinute === null || endMinute === null) return 'Select valid start and end times.'
+  if (startMinute >= endMinute) return 'End time must be later than start time.'
+
+  return ''
+}
+
+function buildWorkingHoursPayload(rows: WorkingHoursDraft[]): WorkingHoursInterval[] {
+  return rows.flatMap((row) => {
+    if (row.day_of_week === '' || !row.start_time || !row.end_time) return []
+
+    const startMinute = parseTimeToMinutes(row.start_time)
+    const endMinute = parseTimeToMinutes(row.end_time)
+    if (startMinute === null || endMinute === null || startMinute >= endMinute) return []
+
+    return [{
+      day_of_week: row.day_of_week,
+      start_minute: startMinute,
+      end_minute: endMinute,
+      working_status: true,
+    }]
+  })
+}
 
 function readStoredHandoff(): RestoredHandoff {
   const rawHandoff = window.sessionStorage.getItem(ONBOARDING_STORAGE_KEY)
@@ -120,14 +203,13 @@ export default function EmployeeAccountActivationPage() {
   const [activationCode, setActivationCode] = useState('')
   const [newUsername, setNewUsername] = useState('')
   const [newPhoneNumber, setNewPhoneNumber] = useState('')
-  // TODO: Add Work hours to the credentials request and response types once backend support exists.
-  const [workHours, setWorkHours] = useState('')
+  const [workingHoursRows, setWorkingHoursRows] = useState<WorkingHoursDraft[]>(emptyWorkingHoursRows)
   const [password, setPassword] = useState('')
   const [passwordConfirmation, setPasswordConfirmation] = useState('')
   const [tokenDuration, setTokenDuration] = useState<number | ''>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [activatedButNotSignedIn, setActivatedButNotSignedIn] = useState(false)
+  const [activatedButNotSignedIn, setActivatedButNotSignedIn] = useState<OnboardingHandoff['flow'] | null>(null)
 
   const normalizedOldUsername = oldUsername.trim()
   const normalizedOldPhone = oldPhoneNumber.trim()
@@ -140,6 +222,10 @@ export default function EmployeeAccountActivationPage() {
     activationCode.trim().length > 0
   const passwordsMatch = password.length > 0 && password === passwordConfirmation
   const isReactivation = handoff?.flow === 'REACTIVATION'
+  const workingHoursPayload = buildWorkingHoursPayload(workingHoursRows)
+  const isWorkingHoursValid =
+    workingHoursPayload.length > 0 &&
+    workingHoursRows.every((row) => getWorkingHoursRowError(row, workingHoursRows) === '')
   const areCredentialsValid =
     passwordsMatch &&
     tokenDuration !== '' &&
@@ -149,9 +235,16 @@ export default function EmployeeAccountActivationPage() {
         normalizedNewUsername.length > 0 &&
         !/\s/.test(normalizedNewUsername) &&
         employeePhonePattern.test(normalizedNewPhone) &&
-        workHours.trim().length > 0
+        isWorkingHoursValid
       )
     )
+
+  const updateWorkingHoursRow = (index: number, changes: Partial<WorkingHoursDraft>) => {
+    setWorkingHoursRows((current) => current.map((row, rowIndex) => (
+      rowIndex === index ? { ...row, ...changes } : row
+    )))
+    setError('')
+  }
 
   const handleActivation = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -248,10 +341,11 @@ export default function EmployeeAccountActivationPage() {
           new_password: password,
           password_confirmation: passwordConfirmation,
           setup_token: handoff.setup_token,
+          working_hours: workingHoursPayload,
         })
 
-        if (!credentialsResponse.activated) {
-          throw new Error('The backend did not confirm account activation.')
+        if (credentialsResponse.activated !== true || credentialsResponse.working_hours_saved !== true) {
+          throw new Error('The backend did not confirm that the account and working hours were saved.')
         }
       }
 
@@ -289,7 +383,7 @@ export default function EmployeeAccountActivationPage() {
       } catch {
         setPassword('')
         setPasswordConfirmation('')
-        setActivatedButNotSignedIn(true)
+        setActivatedButNotSignedIn(handoff.flow)
       }
     } catch (requestError) {
       if (requestError instanceof AccountActivationRequestError && requestError.status === 401) {
@@ -314,7 +408,9 @@ export default function EmployeeAccountActivationPage() {
           <p className="mt-6 text-xs font-extrabold uppercase tracking-[0.2em] text-teal-600">Account activated</p>
           <h1 className="mt-3 font-display text-4xl text-ink">Continue from employee sign in</h1>
           <p className="mt-4 text-sm leading-6 text-slate-500">
-            Your credentials were saved, but automatic sign-in did not complete. Work hours were not saved.
+            {activatedButNotSignedIn === 'ACTIVATION'
+              ? 'Your credentials and working hours were saved, but automatic sign-in did not complete.'
+              : 'Your new password was saved, but automatic sign-in did not complete.'}
           </p>
           <a href="/employee-admin" className="mt-7 inline-flex min-h-12 items-center justify-center rounded-full bg-ink px-7 text-sm font-bold text-white transition hover:bg-teal-700">
             Go to employee sign in
@@ -478,18 +574,86 @@ export default function EmployeeAccountActivationPage() {
                       required
                     />
                   </label>
-                  <label className="form-label">
-                    Work hours
-                    <input
-                      className="form-input"
-                      type="text"
-                      value={workHours}
-                      onChange={(event) => setWorkHours(event.target.value)}
-                      placeholder="Sunday to Thursday, 9 AM to 5 PM"
-                      required
-                    />
-                    <span className="normal-case tracking-normal text-slate-400">Required for this form. Work hours are not saved yet.</span>
-                  </label>
+                  <fieldset className="space-y-3 rounded-[1.25rem] border border-teal-100 bg-white p-4 sm:p-5">
+                    <legend className="px-2 text-xs font-extrabold uppercase tracking-[0.18em] text-teal-600">
+                      Working hours
+                    </legend>
+                    <p className="text-sm leading-6 text-slate-500">
+                      Select up to seven unique working days. Leave unused rows empty.
+                    </p>
+                    <div className="space-y-3">
+                      {workingHoursRows.map((row, index) => {
+                        const rowError = getWorkingHoursRowError(row, workingHoursRows)
+                        const selectedElsewhere = new Set(
+                          workingHoursRows
+                            .filter((_, rowIndex) => rowIndex !== index)
+                            .map((candidate) => candidate.day_of_week),
+                        )
+
+                        return (
+                          <div key={index} className="rounded-xl border border-teal-100 bg-[#f5faf9] p-3">
+                            <div className="grid items-end gap-3 sm:grid-cols-[1.15fr_auto_1fr_auto_1fr]">
+                              <label className="form-label">
+                                Day
+                                <select
+                                  className="form-input"
+                                  value={row.day_of_week}
+                                  onChange={(event) => updateWorkingHoursRow(index, {
+                                    day_of_week: event.target.value === '' ? '' : Number(event.target.value),
+                                  })}
+                                >
+                                  <option value="">Select day</option>
+                                  {workingDays.map((day) => (
+                                    <option
+                                      key={day.value}
+                                      value={day.value}
+                                      disabled={selectedElsewhere.has(day.value)}
+                                    >
+                                      {day.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <span aria-hidden="true" className="hidden pb-4 text-teal-200 sm:block">|</span>
+                              <label className="form-label">
+                                Start
+                                <select
+                                  className="form-input"
+                                  value={row.start_time}
+                                  onChange={(event) => updateWorkingHoursRow(index, { start_time: event.target.value })}
+                                >
+                                  <option value="">Start time</option>
+                                  {timeOptions.map((time) => (
+                                    <option key={time.value} value={time.value}>{time.label}</option>
+                                  ))}
+                                </select>
+                              </label>
+                              <span aria-hidden="true" className="hidden pb-4 text-teal-200 sm:block">|</span>
+                              <label className="form-label">
+                                End
+                                <select
+                                  className="form-input"
+                                  value={row.end_time}
+                                  onChange={(event) => updateWorkingHoursRow(index, { end_time: event.target.value })}
+                                >
+                                  <option value="">End time</option>
+                                  {timeOptions.map((time) => (
+                                    <option key={time.value} value={time.value}>{time.label}</option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
+                            {rowError && (
+                              <p role="alert" className="mt-2 text-xs font-bold text-red-600">{rowError}</p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {workingHoursPayload.length === 0 && (
+                      <p role="alert" className="text-xs font-bold text-red-600">Select at least one complete working day.</p>
+                    )}
+                  </fieldset>
                 </>
               )}
               <label className="form-label">
@@ -532,9 +696,6 @@ export default function EmployeeAccountActivationPage() {
                   ))}
                 </select>
               </label>
-              {!isReactivation && (
-                <StatusMessage tone="neutral">Work hours stay on this page only until backend support is added.</StatusMessage>
-              )}
               {error && <StatusMessage tone="error">{error}</StatusMessage>}
               <button type="submit" disabled={!areCredentialsValid || isSubmitting} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-ink px-6 text-sm font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50">
                 {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
