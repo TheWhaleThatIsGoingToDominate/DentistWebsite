@@ -517,7 +517,6 @@ async function main() {
       url: `${config.apiUrl}/owner/account/deactivate?employee_id=${encodeURIComponent(state.employeeId)}`,
       options: { method: 'POST', headers: ownerHeaders },
       expectedStatus: 200,
-      allowedSensitiveKeys: ['reactivation_code'],
       validate: (body) => {
         const errors = []
         check(isRecord(body), 'Response must be an object.', errors)
@@ -560,6 +559,7 @@ async function main() {
       url: `${config.apiUrl}/owner/account/reactivation/start?employee_id=${encodeURIComponent(state.employeeId)}`,
       options: { method: 'POST', headers: ownerHeaders },
       expectedStatus: 200,
+      allowedSensitiveKeys: ['reactivation_code'],
       validate: (body) => {
         const errors = []
         check(isRecord(body), 'Response must be an object.', errors)

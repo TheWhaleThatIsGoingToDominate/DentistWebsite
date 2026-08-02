@@ -125,6 +125,85 @@ export function assertReactivationStatus({ client, reporter, reactivationId, exp
   })
 }
 
+export async function assertRowCount({
+  client,
+  reporter,
+  name,
+  table,
+  columns,
+  filters,
+  expectedCount,
+}) {
+  if (skipWhenDisabled(client, reporter, name)) return { passed: false, skipped: true, rows: [] }
+
+  try {
+    const rows = await client.select({ table, columns, filters })
+    if (rows.length === expectedCount) {
+      reporter.pass(name, { table, expectedCount })
+      return { passed: true, rows }
+    }
+
+    reporter.fail(name, { table, expectedCount, actualCount: rows.length })
+    return { passed: false, rows }
+  } catch (error) {
+    return reportDatabaseError(reporter, name, error)
+  }
+}
+
+export function assertActivationFailedAttempts({ client, reporter, accountId, expectedAttempts, name }) {
+  return assertRowFieldEquals({
+    client,
+    reporter,
+    name: name || `Account activation failed attempts equal ${expectedAttempts}`,
+    table: 'account_activation',
+    idColumn: 'account_id',
+    id: accountId,
+    field: 'failed_attempts',
+    expected: expectedAttempts,
+  })
+}
+
+export function assertReactivationFailedAttempts({
+  client,
+  reporter,
+  reactivationId,
+  expectedAttempts,
+  name,
+}) {
+  return assertRowFieldEquals({
+    client,
+    reporter,
+    name: name || `Account reactivation failed attempts equal ${expectedAttempts}`,
+    table: 'account_reactivation',
+    idColumn: 'reactivation_id',
+    id: reactivationId,
+    field: 'failed_attempts',
+    expected: expectedAttempts,
+  })
+}
+
+export function assertNullableFieldEquals({
+  client,
+  reporter,
+  name,
+  table,
+  idColumn,
+  id,
+  field,
+  expected = null,
+}) {
+  return assertRowFieldEquals({
+    client,
+    reporter,
+    name,
+    table,
+    idColumn,
+    id,
+    field,
+    expected,
+  })
+}
+
 function normalizeWorkingHours(intervals) {
   if (!Array.isArray(intervals)) {
     throw new Error('Expected working hours must be an array.')

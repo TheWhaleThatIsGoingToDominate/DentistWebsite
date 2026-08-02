@@ -9,6 +9,7 @@ export const SAFE_DATABASE_SCHEMA = Object.freeze({
     columns: Object.freeze([
       'account_id',
       'status',
+      'failed_attempts',
       'code_expiry_time',
       'setup_token_expiry_time',
     ]),
@@ -19,6 +20,7 @@ export const SAFE_DATABASE_SCHEMA = Object.freeze({
       'reactivation_id',
       'employee_id',
       'status',
+      'failed_attempts',
       'code_expiry_time',
       'setup_token_expiry_time',
     ]),

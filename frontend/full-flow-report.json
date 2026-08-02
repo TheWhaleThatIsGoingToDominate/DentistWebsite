@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-02T18:49:25.088Z",
+  "generatedAt": "2026-08-02T19:23:53.190Z",
   "summary": {
-    "passed": 5,
-    "failed": 1,
-    "skipped": 2
+    "passed": 32,
+    "failed": 0,
+    "skipped": 1
   },
   "results": [
     {
@@ -45,25 +45,252 @@
     },
     {
       "section": "Account creation",
-      "status": "FAIL",
+      "status": "PASS",
       "name": "Pending account appears in owner list",
       "details": {
         "path": "/owner/accounts/pending",
-        "httpStatus": 500,
-        "error": null,
-        "body": {
-          "detail": "non-hexadecimal number found in fromhex() arg at position 0"
-        },
-        "validationErrors": [],
-        "forbiddenKeys": []
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Account creation",
+      "status": "PASS",
+      "name": "Pending employee profile is correct",
+      "details": {
+        "path": "/owner/accounts/pending/ID-d6f479e8-c5b4-445d-a7df-a99278fca193",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Normal activation",
+      "status": "PASS",
+      "name": "Employee activation code verifies",
+      "details": {
+        "path": "/employee/account/activate",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Normal activation",
+      "status": "PASS",
+      "name": "Account activation status is SETTING_UP_CREDENTIALS",
+      "details": {
+        "table": "account_activation",
+        "field": "status",
+        "expected": "SETTING_UP_CREDENTIALS"
+      }
+    },
+    {
+      "section": "Normal activation",
+      "status": "PASS",
+      "name": "Credentials and working hours are saved",
+      "details": {
+        "path": "/employee/account/credentials",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Activated employee",
+      "status": "PASS",
+      "name": "Activated employee authenticates",
+      "details": {
+        "path": "/employee/auth",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Activated employee",
+      "status": "PASS",
+      "name": "Activated account leaves pending list",
+      "details": {
+        "path": "/owner/accounts/pending",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Activated employee",
+      "status": "PASS",
+      "name": "Activation row was removed after credentials",
+      "details": {
+        "table": "account_activation"
+      }
+    },
+    {
+      "section": "Activated employee",
+      "status": "PASS",
+      "name": "Activated employee appears in created list",
+      "details": {
+        "path": "/owner/accounts/created",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Activated employee",
+      "status": "PASS",
+      "name": "Employee active state is true",
+      "details": {
+        "table": "employees",
+        "field": "is_active",
+        "expected": true
+      }
+    },
+    {
+      "section": "Activated employee",
+      "status": "PASS",
+      "name": "Employee working hours match exactly",
+      "details": {
+        "table": "employee_working_hours",
+        "matchedRows": 3
+      }
+    },
+    {
+      "section": "Activated employee",
+      "status": "PASS",
+      "name": "Created employee profile is active and correct",
+      "details": {
+        "path": "/owner/accounts/created/ID-d6f479e8-c5b4-445d-a7df-a99278fca193",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Reactivation is rejected while employee is active",
+      "details": {
+        "path": "/owner/account/reactivation/start",
+        "httpStatus": 409
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Owner deactivates employee",
+      "details": {
+        "path": "/owner/account/deactivate",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Employee active state is false",
+      "details": {
+        "table": "employees",
+        "field": "is_active",
+        "expected": false
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Created employee profile becomes inactive",
+      "details": {
+        "path": "/owner/accounts/created/ID-d6f479e8-c5b4-445d-a7df-a99278fca193",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Owner starts employee reactivation",
+      "details": {
+        "path": "/owner/account/reactivation/start",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Account reactivation status is PENDING_VERIFICATION",
+      "details": {
+        "table": "account_reactivation",
+        "field": "status",
+        "expected": "PENDING_VERIFICATION"
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Reactivation references the expected employee",
+      "details": {
+        "table": "account_reactivation",
+        "field": "employee_id",
+        "expected": "ID-d6f479e8-c5b4-445d-a7df-a99278fca193"
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Created profile exposes safe pending reactivation state",
+      "details": {
+        "path": "/owner/accounts/created/ID-d6f479e8-c5b4-445d-a7df-a99278fca193",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Employee reactivation code verifies",
+      "details": {
+        "path": "/employee/account/activate",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Account reactivation status is SETTING_UP_CREDENTIALS",
+      "details": {
+        "table": "account_reactivation",
+        "field": "status",
+        "expected": "SETTING_UP_CREDENTIALS"
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Employee renews password and completes reactivation",
+      "details": {
+        "path": "/employee/account/reactivation/credentials",
+        "httpStatus": 200
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Employee active state is true",
+      "details": {
+        "table": "employees",
+        "field": "is_active",
+        "expected": true
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Account reactivation status is COMPLETED",
+      "details": {
+        "table": "account_reactivation",
+        "field": "status",
+        "expected": "COMPLETED"
+      }
+    },
+    {
+      "section": "Deactivation and reactivation",
+      "status": "PASS",
+      "name": "Reactivated employee authenticates with renewed password",
+      "details": {
+        "path": "/employee/auth",
+        "httpStatus": 200
       }
     },
     {
       "section": "Session cleanup",
-      "status": "SKIP",
+      "status": "PASS",
       "name": "Employee logout",
       "details": {
-        "reason": "No token was created."
+        "path": "/employee/auth/logout",
+        "httpStatus": 200
       }
     },
     {
@@ -88,13 +315,13 @@
           "employees by employee_id"
         ],
         "manifest": {
-          "runId": "20260802184919_9bfd0e",
-          "pendingUsername": "aurora_e2e_pending_20260802184919_9bfd0e",
-          "activeUsername": "aurora_e2e_active_20260802184919_9bfd0e",
-          "phoneNumber": "01942361782",
-          "accountId": "ID-a918a84a-418e-4dfa-8958-bbd889b5d93b",
-          "employeeId": null,
-          "reactivationId": null
+          "runId": "20260802192337_d8fba3",
+          "pendingUsername": "aurora_e2e_pending_20260802192337_d8fba3",
+          "activeUsername": "aurora_e2e_active_20260802192337_d8fba3",
+          "phoneNumber": "01952118336",
+          "accountId": "ID-d6f479e8-c5b4-445d-a7df-a99278fca193",
+          "employeeId": "ID-d6f479e8-c5b4-445d-a7df-a99278fca193",
+          "reactivationId": "RID-fcZq%SckA#"
         }
       }
     }
