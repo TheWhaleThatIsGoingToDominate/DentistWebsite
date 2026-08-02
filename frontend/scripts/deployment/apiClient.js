@@ -1,4 +1,4 @@
-const sensitiveKeyPattern = /authorization|password|secret|api[_-]?key|service[_-]?role|activation_code|reactivation_code|setup_token|(^|_)token($|_)/i
+const sensitiveKeyPattern = /authorization|password|secret|api[_-]?key|service[_-]?role|activation[_-]?code|reactivation[_-]?code|setup[_-]?token|hash|salt|lookup|(^|[_-])token($|[_-])/i
 
 function redactString(value) {
   if (/^bearer\s+/i.test(value)) return '[REDACTED]'

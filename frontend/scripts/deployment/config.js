@@ -25,6 +25,8 @@ function normalizeUrl(value, variableName) {
 function parseFlags(argv) {
   const flags = {
     write: false,
+    dbCheck: false,
+    confirmNoCleanup: false,
     verbose: false,
     reportPath: null,
   }
@@ -32,6 +34,10 @@ function parseFlags(argv) {
   for (const argument of argv) {
     if (argument === '--write') {
       flags.write = true
+    } else if (argument === '--db-check') {
+      flags.dbCheck = true
+    } else if (argument === '--confirm-no-cleanup') {
+      flags.confirmNoCleanup = true
     } else if (argument === '--verbose') {
       flags.verbose = true
     } else if (argument.startsWith('--report=')) {
@@ -78,6 +84,7 @@ export function loadDeploymentConfig(argv = process.argv.slice(2)) {
     testPhonePrefix: process.env.TEST_PHONE_PREFIX?.trim() || '019',
     flags,
     owner: null,
+    supabase: null,
   }
 
   if (flags.write) {
@@ -86,6 +93,13 @@ export function loadDeploymentConfig(argv = process.argv.slice(2)) {
       phoneNumber: requireEnvironment('TEST_OWNER_PHONE'),
       password: requireEnvironment('TEST_OWNER_PASSWORD'),
       validTime,
+    }
+  }
+
+  if (flags.dbCheck) {
+    config.supabase = {
+      url: normalizeUrl(requireEnvironment('SUPABASE_URL'), 'SUPABASE_URL'),
+      serviceRoleKey: requireEnvironment('SUPABASE_SERVICE_ROLE_KEY'),
     }
   }
 
