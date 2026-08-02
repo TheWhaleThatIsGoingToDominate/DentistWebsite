@@ -46,6 +46,8 @@ def generateNewCode(data: newActivationCode, _=Depends(require_role("owner"))):
 def loadCreatedAccounts(username: str | None = None, phone_number: str | None = None, _=Depends(require_role("owner"))):
     try:
         return load_created_accounts(username, phone_number)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -56,6 +58,8 @@ def loadCreatedAccounts(username: str | None = None, phone_number: str | None = 
 def LoadPendingAccounts(username: str | None = None, phone_number: str | None = None, _=Depends(require_role("owner"))):
     try:
         return load_pending_accounts(username, phone_number)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
