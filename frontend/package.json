@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test:deploy:smoke": "node --env-file=scripts/deployment/deployment.env scripts/deployment/smoke-test.js",
     "test:deploy:full": "node --env-file=scripts/deployment/deployment.env scripts/deployment/full-flow-test.js",
-    "test:deploy:negative": "node --env-file=scripts/deployment/deployment.env scripts/deployment/negative-test.js"
+    "test:deploy:negative": "node --env-file=scripts/deployment/deployment.env scripts/deployment/negative-test.js",
+    "test:deploy:expiry": "node --env-file=scripts/deployment/deployment.env scripts/deployment/expiry-test.js"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

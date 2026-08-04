@@ -27,6 +27,7 @@ function parseFlags(argv) {
     write: false,
     dbCheck: false,
     confirmNoCleanup: false,
+    expiry: false,
     verbose: false,
     reportPath: null,
   }
@@ -38,6 +39,8 @@ function parseFlags(argv) {
       flags.dbCheck = true
     } else if (argument === '--confirm-no-cleanup') {
       flags.confirmNoCleanup = true
+    } else if (argument === '--expiry') {
+      flags.expiry = true
     } else if (argument === '--verbose') {
       flags.verbose = true
     } else if (argument.startsWith('--report=')) {
