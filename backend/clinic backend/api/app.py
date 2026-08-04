@@ -6,7 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 import importlib, pkgutil
 from api import routers as routers_package
 
-
 app = FastAPI()
 
 @app.exception_handler(RequestValidationError)
