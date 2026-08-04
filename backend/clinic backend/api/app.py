@@ -1,11 +1,28 @@
 #imports
-from fastapi import FastAPI
+from fastapi import FastAPI, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import importlib, pkgutil
 from api import routers as routers_package
 
 
 app = FastAPI()
+
+@app.exception_handler(RequestValidationError)
+async def handler_function(_request, exception: RequestValidationError):
+    safe_errors = []
+    for error in exception.errors():
+        clean_error = {
+            "type":error.get("type"),
+            "loc":error.get("loc"),
+            "msg":error.get("msg")
+        }
+        safe_errors.append(clean_error)
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, 
+        content={"detail":safe_errors}
+    )
 
 
 for _ ,module_name, _ in pkgutil.iter_modules(routers_package.__path__):
