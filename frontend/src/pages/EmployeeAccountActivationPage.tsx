@@ -581,7 +581,7 @@ export default function EmployeeAccountActivationPage() {
                     <p className="text-sm leading-6 text-slate-500">
                       Select up to seven unique working days. Leave unused rows empty.
                     </p>
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {workingHoursRows.map((row, index) => {
                         const rowError = getWorkingHoursRowError(row, workingHoursRows)
                         const selectedElsewhere = new Set(
@@ -591,12 +591,12 @@ export default function EmployeeAccountActivationPage() {
                         )
 
                         return (
-                          <div key={index} className="rounded-xl border border-teal-100 bg-[#f5faf9] p-3">
-                            <div className="grid items-end gap-3 sm:grid-cols-[1.15fr_auto_1fr_auto_1fr]">
-                              <label className="form-label">
+                          <div key={index} className="rounded-lg border border-teal-100 bg-[#f5faf9] p-2">
+                            <div className="grid items-end gap-2 sm:grid-cols-[1.15fr_auto_1fr_auto_1fr]">
+                              <label className="form-label !gap-1 !text-[11px]">
                                 Day
                                 <select
-                                  className="form-input"
+                                  className="form-input min-h-10 !rounded-lg !px-3 !py-2 !text-sm"
                                   value={row.day_of_week}
                                   onChange={(event) => updateWorkingHoursRow(index, {
                                     day_of_week: event.target.value === '' ? '' : Number(event.target.value),
@@ -614,11 +614,11 @@ export default function EmployeeAccountActivationPage() {
                                   ))}
                                 </select>
                               </label>
-                              <span aria-hidden="true" className="hidden pb-4 text-teal-200 sm:block">|</span>
-                              <label className="form-label">
+                              <span aria-hidden="true" className="hidden pb-3 text-teal-200 sm:block">|</span>
+                              <label className="form-label !gap-1 !text-[11px]">
                                 Start
                                 <select
-                                  className="form-input"
+                                  className="form-input min-h-10 !rounded-lg !px-3 !py-2 !text-sm"
                                   value={row.start_time}
                                   onChange={(event) => updateWorkingHoursRow(index, { start_time: event.target.value })}
                                 >
@@ -628,11 +628,11 @@ export default function EmployeeAccountActivationPage() {
                                   ))}
                                 </select>
                               </label>
-                              <span aria-hidden="true" className="hidden pb-4 text-teal-200 sm:block">|</span>
-                              <label className="form-label">
+                              <span aria-hidden="true" className="hidden pb-3 text-teal-200 sm:block">|</span>
+                              <label className="form-label !gap-1 !text-[11px]">
                                 End
                                 <select
-                                  className="form-input"
+                                  className="form-input min-h-10 !rounded-lg !px-3 !py-2 !text-sm"
                                   value={row.end_time}
                                   onChange={(event) => updateWorkingHoursRow(index, { end_time: event.target.value })}
                                 >
