@@ -27,8 +27,31 @@ def view_profile(employee_id:str):
             detail="employee not found"
         )
 
+    working_hours = (
+        supabase.table("employee_working_hours")
+        .select("employee_id, day_of_week, start_minute, end_minute, working_status")
+        .eq("employee_id", employee_id)
+        .execute().data
+    )
+
+    if not working_hours:
+        raise HTTPException(
+            status_code=404,
+            detail="working hours of current user not found"
+        )
+    
     for key in profile:
         key["username"]=decryptor(key["username"])
         key["phone_number"]=decryptor(key["phone_number"])
         key["role"] = decrypt_employee_role(key["employee_id"],key["role"])
-    return {"profile":profile[0]}
+
+    for hour in working_hours:
+        hour["day_of_week"] = decryptor(hour["day_of_week"] )
+        hour["start_minute"] = decryptor(hour["start_minute"])
+        hour["end_minute"] = decryptor(hour["end_minute"])
+        hour["working_status"] = decryptor(hour["working_status"])
+
+    return {
+        "profile":profile[0], 
+        "working_hours":working_hours[0]
+    }

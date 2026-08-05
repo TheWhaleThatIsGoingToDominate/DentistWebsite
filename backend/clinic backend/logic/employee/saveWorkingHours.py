@@ -1,5 +1,6 @@
 from database.main import supabase
 from fastapi import HTTPException
+from logic.auth.authentication import encryptor
 
 def save_working_hours(working_hours: list, employee_id):
     if not working_hours or not employee_id:
@@ -7,8 +8,8 @@ def save_working_hours(working_hours: list, employee_id):
     seenDays = set()
     elements = []
     for interval in working_hours:
-        day = interval["day_of_week"] 
-        start = interval["start_minute"] 
+        day =  interval["day_of_week"]
+        start = interval["start_minute"]
         end = interval["end_minute"]
         working_status = interval["working_status"]
         
@@ -23,6 +24,12 @@ def save_working_hours(working_hours: list, employee_id):
         
         if not start < end: 
             raise HTTPException(status_code=400,detail="invalid input")
+
+        #encrypting the values here
+        day = encryptor(day) 
+        start = encryptor(start) 
+        end = encryptor(end)
+        working_status = encryptor(working_status)
 
         #* logic is here
         if not working_status:

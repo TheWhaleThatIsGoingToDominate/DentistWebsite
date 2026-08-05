@@ -574,14 +574,14 @@ export default function EmployeeAccountActivationPage() {
                       required
                     />
                   </label>
-                  <fieldset className="space-y-3 rounded-[1.25rem] border border-teal-100 bg-white p-4 sm:p-5">
+                  <fieldset className="space-y-2 rounded-xl border border-teal-100 bg-white p-3 sm:p-4">
                     <legend className="px-2 text-xs font-extrabold uppercase tracking-[0.18em] text-teal-600">
                       Working hours
                     </legend>
-                    <p className="text-sm leading-6 text-slate-500">
+                    <p className="text-xs leading-5 text-slate-500">
                       Select up to seven unique working days. Leave unused rows empty.
                     </p>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       {workingHoursRows.map((row, index) => {
                         const rowError = getWorkingHoursRowError(row, workingHoursRows)
                         const selectedElsewhere = new Set(
@@ -591,12 +591,12 @@ export default function EmployeeAccountActivationPage() {
                         )
 
                         return (
-                          <div key={index} className="rounded-lg border border-teal-100 bg-[#f5faf9] p-2">
-                            <div className="grid items-end gap-2 sm:grid-cols-[1.15fr_auto_1fr_auto_1fr]">
-                              <label className="form-label !gap-1 !text-[11px]">
+                          <div key={index} className="rounded-md border border-teal-100 bg-[#f5faf9] px-2 py-1.5">
+                            <div className="grid items-end gap-1.5 sm:grid-cols-[1.15fr_auto_1fr_auto_1fr]">
+                              <label className="form-label !gap-0.5 !text-[11px]">
                                 Day
                                 <select
-                                  className="form-input min-h-10 !rounded-lg !px-3 !py-2 !text-sm"
+                                  className="form-input min-h-10 !rounded-md !px-2.5 !py-1.5 !text-sm"
                                   value={row.day_of_week}
                                   onChange={(event) => updateWorkingHoursRow(index, {
                                     day_of_week: event.target.value === '' ? '' : Number(event.target.value),
@@ -614,11 +614,11 @@ export default function EmployeeAccountActivationPage() {
                                   ))}
                                 </select>
                               </label>
-                              <span aria-hidden="true" className="hidden pb-3 text-teal-200 sm:block">|</span>
-                              <label className="form-label !gap-1 !text-[11px]">
+                              <span aria-hidden="true" className="hidden pb-2.5 text-teal-200 sm:block">|</span>
+                              <label className="form-label !gap-0.5 !text-[11px]">
                                 Start
                                 <select
-                                  className="form-input min-h-10 !rounded-lg !px-3 !py-2 !text-sm"
+                                  className="form-input min-h-10 !rounded-md !px-2.5 !py-1.5 !text-sm"
                                   value={row.start_time}
                                   onChange={(event) => updateWorkingHoursRow(index, { start_time: event.target.value })}
                                 >
@@ -628,11 +628,11 @@ export default function EmployeeAccountActivationPage() {
                                   ))}
                                 </select>
                               </label>
-                              <span aria-hidden="true" className="hidden pb-3 text-teal-200 sm:block">|</span>
-                              <label className="form-label !gap-1 !text-[11px]">
+                              <span aria-hidden="true" className="hidden pb-2.5 text-teal-200 sm:block">|</span>
+                              <label className="form-label !gap-0.5 !text-[11px]">
                                 End
                                 <select
-                                  className="form-input min-h-10 !rounded-lg !px-3 !py-2 !text-sm"
+                                  className="form-input min-h-10 !rounded-md !px-2.5 !py-1.5 !text-sm"
                                   value={row.end_time}
                                   onChange={(event) => updateWorkingHoursRow(index, { end_time: event.target.value })}
                                 >
@@ -644,7 +644,7 @@ export default function EmployeeAccountActivationPage() {
                               </label>
                             </div>
                             {rowError && (
-                              <p role="alert" className="mt-2 text-xs font-bold text-red-600">{rowError}</p>
+                              <p role="alert" className="mt-1 text-xs font-bold text-red-600">{rowError}</p>
                             )}
                           </div>
                         )
