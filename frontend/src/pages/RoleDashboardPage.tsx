@@ -636,7 +636,8 @@ function RoleWorkSection({ config }: { config: RoleConfig }) {
 
 function DashboardHeaderActions() {
   return (
-    <div className="flex max-w-full items-center gap-2">
+    <div className="flex w-full max-w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
+      <SessionExpiryCountdown />
       <a
         href="/role-dashboard/profile"
         aria-label="View your profile"
@@ -645,7 +646,6 @@ function DashboardHeaderActions() {
       >
         <UserRound className="h-5 w-5" />
       </a>
-      <SessionExpiryCountdown />
     </div>
   )
 }
@@ -656,8 +656,8 @@ function CleanRoleDashboard({ config }: { config: RoleConfig }) {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f5faf9]">
       <aside className="overflow-x-hidden border-b border-teal-100 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl flex-col items-start gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-          <a href={dashboardRoute()} className="flex items-center gap-3">
+        <div className="mx-auto flex w-full max-w-7xl flex-col items-end gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:gap-6 lg:px-8">
+          <a href={dashboardRoute()} className="flex shrink-0 items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-gold-300">
               <PanelTop className="h-5 w-5" />
             </span>
@@ -707,8 +707,8 @@ function OwnerDashboard({ config }: { config: RoleConfig }) {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f5faf9]">
       <aside className="border-b border-teal-100 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col items-start gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-          <a href={dashboardRoute()} className="flex items-center gap-3">
+        <div className="mx-auto flex w-full max-w-7xl flex-col items-end gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:gap-6 lg:px-8">
+          <a href={dashboardRoute()} className="flex shrink-0 items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-gold-300">
               <PanelTop className="h-5 w-5" />
             </span>
