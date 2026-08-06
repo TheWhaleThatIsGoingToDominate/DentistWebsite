@@ -131,7 +131,8 @@ def deleteTheBooking(data: bookingDeleting, role=Depends(require_role("owner", "
 def loadMyProfile(employee=Depends(require_employee_auth)):
     try:
         employee_id = employee[0]["employee_id"]
-        return view_profile(employee_id)
+        role = employee[0]["role"]
+        return view_profile(employee_id, role)
     except HTTPException:
         raise
     except Exception as e:

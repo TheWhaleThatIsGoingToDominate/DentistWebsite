@@ -12,6 +12,7 @@ import {
   Sparkles,
   Stethoscope,
   UserCog,
+  UserRound,
   UsersRound,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -633,6 +634,22 @@ function RoleWorkSection({ config }: { config: RoleConfig }) {
   )
 }
 
+function DashboardHeaderActions() {
+  return (
+    <div className="flex max-w-full items-center gap-2">
+      <a
+        href="/role-dashboard/profile"
+        aria-label="View your profile"
+        title="View your profile"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-teal-100 bg-[#f5faf9] text-teal-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50 focus:outline-none focus:ring-4 focus:ring-teal-100"
+      >
+        <UserRound className="h-5 w-5" />
+      </a>
+      <SessionExpiryCountdown />
+    </div>
+  )
+}
+
 function CleanRoleDashboard({ config }: { config: RoleConfig }) {
   const Icon = config.icon
 
@@ -649,7 +666,7 @@ function CleanRoleDashboard({ config }: { config: RoleConfig }) {
               <p className="text-[10px] font-extrabold uppercase tracking-[0.26em] text-teal-600">Clinic platform</p>
             </div>
           </a>
-          <SessionExpiryCountdown />
+          <DashboardHeaderActions />
         </div>
       </aside>
 
@@ -700,7 +717,7 @@ function OwnerDashboard({ config }: { config: RoleConfig }) {
               <p className="text-[10px] font-extrabold uppercase tracking-[0.26em] text-teal-600">Clinic platform</p>
             </div>
           </a>
-          <SessionExpiryCountdown />
+          <DashboardHeaderActions />
         </div>
       </aside>
 

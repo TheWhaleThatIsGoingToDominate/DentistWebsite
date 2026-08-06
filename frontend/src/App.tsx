@@ -18,6 +18,7 @@ import EmployeeAccountActivationPage from './pages/EmployeeAccountActivationPage
 import EmployeeAccountsPage from './pages/EmployeeAccountsPage'
 import CreateEmployeeAccountPage from './pages/CreateEmployeeAccountPage'
 import ManageEmployeeAccountsPage from './pages/ManageEmployeeAccountsPage'
+import EmployeeProfilePage from './pages/EmployeeProfilePage'
 import RoleDashboardPage from './pages/RoleDashboardPage'
 import RolePlaceholderPage from './pages/RolePlaceholderPage'
 
@@ -488,6 +489,14 @@ export default function App() {
     return (
       <ScheduleProvider>
         <RoleDashboardPage />
+      </ScheduleProvider>
+    )
+  }
+
+  if (route === '/role-dashboard/profile') {
+    return (
+      <ScheduleProvider>
+        <EmployeeProfilePage />
       </ScheduleProvider>
     )
   }

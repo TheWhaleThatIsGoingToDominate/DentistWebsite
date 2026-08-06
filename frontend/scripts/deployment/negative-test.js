@@ -147,6 +147,12 @@ function accountCreationValidation(expectedRole) {
   }
 }
 
+function profileRejectionValidation(body) {
+  const errors = []
+  check(!isRecord(body) || !('profile' in body), 'Rejected profile request returned profile data.', errors)
+  return errors
+}
+
 async function createPendingAccount({ client, reporter, config, ownerHeaders, fixture }) {
   const body = await expectApiStep({
     client,
@@ -440,6 +446,49 @@ async function main() {
         expectedStatus: 401,
       })
     })
+
+    const profileRejectionCases = [
+      { name: 'Profile endpoint rejects missing authentication' },
+      {
+        name: 'Profile endpoint rejects a fabricated token',
+        headers: buildOwnerHeaders({
+          username: config.owner.username,
+          phoneNumber: config.owner.phoneNumber,
+          token: 'fabricated-profile-test-token',
+        }),
+      },
+      {
+        name: 'Profile endpoint rejects a mismatched username',
+        headers: buildOwnerHeaders({
+          username: `${config.owner.username}_mismatch`,
+          phoneNumber: config.owner.phoneNumber,
+          token: ownerToken,
+        }),
+      },
+    ]
+    const replacementDigit = config.owner.phoneNumber.endsWith('0') ? '1' : '0'
+    profileRejectionCases.push({
+      name: 'Profile endpoint rejects a mismatched phone number',
+      headers: buildOwnerHeaders({
+        username: config.owner.username,
+        phoneNumber: `${config.owner.phoneNumber.slice(0, -1)}${replacementDigit}`,
+        token: ownerToken,
+      }),
+    })
+
+    for (const rejectionCase of profileRejectionCases) {
+      await runScenario(reporter, rejectionCase.name, async () => {
+        await expectApiStep({
+          client,
+          reporter,
+          name: rejectionCase.name,
+          url: `${config.apiUrl}/employee/admin/employee/profile`,
+          options: rejectionCase.headers ? { headers: rejectionCase.headers } : {},
+          expectedStatus: 401,
+          validate: profileRejectionValidation,
+        })
+      })
+    }
 
     await runScenario(reporter, 'Duplicate pending account', async () => {
       const fixture = fixtures.duplicate

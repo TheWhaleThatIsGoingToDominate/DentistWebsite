@@ -1,4 +1,9 @@
-import { buildOwnerHeaders, createApiClient, redact } from './apiClient.js'
+import {
+  buildOwnerHeaders,
+  createApiClient,
+  findSensitiveResponseKeys,
+  redact,
+} from './apiClient.js'
 import { DeploymentConfigError, loadDeploymentConfig } from './config.js'
 import {
   assertAccountActivationStatus,
@@ -69,6 +74,69 @@ function safeResultDetails(result, validationErrors = [], forbiddenKeys = []) {
 
 function check(condition, message, errors) {
   if (!condition) errors.push(message)
+}
+
+function validateWorkingHours(expectedRows, returnedRows, employeeId) {
+  const errors = []
+  check(Array.isArray(returnedRows), 'working_hours must be an array.', errors)
+  if (!Array.isArray(returnedRows)) return errors
+
+  const returnedDays = returnedRows.filter(isRecord).map((row) => row.day_of_week)
+  check(new Set(returnedDays).size === returnedDays.length, 'working_hours contains duplicate days.', errors)
+  check(returnedRows.length === expectedRows.length, 'working_hours row count does not match.', errors)
+
+  const expected = [...expectedRows].sort((a, b) => a.day_of_week - b.day_of_week)
+  const returned = [...returnedRows].sort((a, b) => Number(a?.day_of_week) - Number(b?.day_of_week))
+
+  returned.forEach((row, index) => {
+    const expectedRow = expected[index]
+    check(isRecord(row), `working_hours row ${index} must be an object.`, errors)
+    if (!isRecord(row)) return
+
+    check(row.employee_id === employeeId, `working_hours row ${index} has the wrong employee_id.`, errors)
+    check(Number.isInteger(row.day_of_week) && row.day_of_week >= 0 && row.day_of_week <= 6, `working_hours row ${index} has an invalid day_of_week.`, errors)
+    check(Number.isInteger(row.start_minute) && row.start_minute >= 0 && row.start_minute <= 1439, `working_hours row ${index} has an invalid start_minute.`, errors)
+    check(Number.isInteger(row.end_minute) && row.end_minute >= 1 && row.end_minute <= 1440, `working_hours row ${index} has an invalid end_minute.`, errors)
+    check(row.start_minute < row.end_minute, `working_hours row ${index} must start before it ends.`, errors)
+    check(typeof row.working_status === 'boolean', `working_hours row ${index} has an invalid working_status.`, errors)
+
+    if (expectedRow) {
+      for (const field of ['day_of_week', 'start_minute', 'end_minute', 'working_status']) {
+        check(row[field] === expectedRow[field], `working_hours row ${index} ${field} does not match.`, errors)
+      }
+    }
+  })
+
+  return errors
+}
+
+function currentProfileValidation({ employeeId, username, phoneNumber, role, workingHours: expectedHours }) {
+  return (body) => {
+    const errors = []
+    const profile = isRecord(body) && isRecord(body.profile) ? body.profile : null
+    const returnedHours = isRecord(body) ? body.working_hours : null
+
+    check(isRecord(body), 'Profile response must be an object.', errors)
+    check(Boolean(profile), 'profile must be an object.', errors)
+    check(findSensitiveResponseKeys(body).length === 0, 'Profile response contains sensitive fields.', errors)
+    if (!profile) return errors
+
+    if (employeeId !== null) check(profile.employee_id === employeeId, 'profile.employee_id does not match.', errors)
+    check(isNonEmptyString(profile.employee_id), 'profile.employee_id is required.', errors)
+    check(profile.username === username, 'profile.username does not match.', errors)
+    check(profile.phone_number === phoneNumber, 'profile.phone_number does not match.', errors)
+    check(profile.role === role, 'profile.role does not match.', errors)
+    check(typeof profile.is_active === 'boolean', 'profile.is_active must be boolean.', errors)
+
+    if (expectedHours === null) {
+      check(Array.isArray(returnedHours), 'working_hours must be an array.', errors)
+      check(Array.isArray(returnedHours) && returnedHours.length === 0, 'Owner working_hours must be empty.', errors)
+    } else {
+      errors.push(...validateWorkingHours(expectedHours, returnedHours, profile.employee_id))
+    }
+
+    return errors
+  }
 }
 
 async function expectApiStep({
@@ -199,6 +267,7 @@ async function main() {
   const state = {
     accountId: null,
     employeeId: null,
+    ownerEmployeeId: null,
     reactivationId: null,
     ownerToken: null,
     employeeToken: null,
@@ -229,6 +298,23 @@ async function main() {
       phoneNumber: config.owner.phoneNumber,
       token: state.ownerToken,
     })
+
+    const ownerProfile = await expectApiStep({
+      client,
+      reporter,
+      name: 'Owner loads their current profile safely',
+      url: `${config.apiUrl}/employee/admin/employee/profile`,
+      options: { headers: ownerHeaders },
+      expectedStatus: 200,
+      validate: currentProfileValidation({
+        employeeId: null,
+        username: config.owner.username,
+        phoneNumber: config.owner.phoneNumber,
+        role: 'OWNER',
+        workingHours: null,
+      }),
+    })
+    state.ownerEmployeeId = ownerProfile.profile.employee_id
 
     reporter.section('Account creation')
     const created = await expectApiStep({
@@ -476,6 +562,58 @@ async function main() {
       employeeId: state.employeeId,
       expectedIntervals: workingHours,
     })
+
+    const employeeHeaders = buildOwnerHeaders({
+      username: testData.activeUsername,
+      phoneNumber: testData.phoneNumber,
+      token: state.employeeToken,
+    })
+    const employeeProfileValidation = currentProfileValidation({
+      employeeId: state.employeeId,
+      username: testData.activeUsername,
+      phoneNumber: testData.phoneNumber,
+      role: config.testEmployeeRole,
+      workingHours,
+    })
+
+    await expectApiStep({
+      client,
+      reporter,
+      name: 'Employee loads their current profile and working hours',
+      url: `${config.apiUrl}/employee/admin/employee/profile`,
+      options: { headers: employeeHeaders },
+      expectedStatus: 200,
+      validate: employeeProfileValidation,
+    })
+
+    const profileSpoofingChecks = [
+      {
+        name: 'Spoofed role header cannot change the employee profile',
+        url: `${config.apiUrl}/employee/admin/employee/profile`,
+        headers: { ...employeeHeaders, 'X-Employee-Role': 'OWNER' },
+      },
+      {
+        name: 'Role query cannot change the employee profile',
+        url: `${config.apiUrl}/employee/admin/employee/profile?role=OWNER`,
+        headers: employeeHeaders,
+      },
+      {
+        name: 'Employee ID query cannot select another profile',
+        url: `${config.apiUrl}/employee/admin/employee/profile?employee_id=${encodeURIComponent(state.ownerEmployeeId)}`,
+        headers: employeeHeaders,
+      },
+    ]
+    for (const spoofingCheck of profileSpoofingChecks) {
+      await expectApiStep({
+        client,
+        reporter,
+        name: spoofingCheck.name,
+        url: spoofingCheck.url,
+        options: { headers: spoofingCheck.headers },
+        expectedStatus: 200,
+        validate: employeeProfileValidation,
+      })
+    }
 
     const createdProfile = await expectApiStep({
       client,
