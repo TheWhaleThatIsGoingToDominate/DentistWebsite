@@ -1,4 +1,4 @@
-import { buildOwnerHeaders, createApiClient } from './apiClient.js'
+import { createApiClient } from './apiClient.js'
 import { DeploymentConfigError, loadDeploymentConfig } from './config.js'
 import {
   assertAccountActivationStatus,
@@ -153,15 +153,49 @@ function profileRejectionValidation(body) {
   return errors
 }
 
-async function createPendingAccount({ client, reporter, config, ownerHeaders, fixture }) {
+function authValidation(expectedRole, sessionClient) {
+  return (body) => {
+    const errors = []
+    const cookie = sessionClient.getLastCookieMetadata()
+    check(body?.allowed === true, 'allowed must be true.', errors)
+    check(isNonEmptyString(body?.expires_at) && !Number.isNaN(Date.parse(body.expires_at)), 'expires_at must be valid.', errors)
+    check(body?.role === expectedRole, `role must be ${expectedRole}.`, errors)
+    check(!isRecord(body) || !('token' in body), 'Login JSON must not contain token.', errors)
+    check(!isRecord(body) || !('employee_id' in body), 'Login JSON must not contain employee_id.', errors)
+    check(sessionClient.hasSessionCookie(), 'Session cookie was not captured.', errors)
+    check(cookie?.name === '__Host-aurora_session', 'Unexpected session cookie name.', errors)
+    check(cookie?.received === true, 'Session cookie metadata must show receipt.', errors)
+    check(cookie?.httpOnly === true, 'Session cookie must be HttpOnly.', errors)
+    check(cookie?.secure === true, 'Session cookie must be Secure.', errors)
+    check(cookie?.sameSite?.toLowerCase() === 'none', 'Session cookie must use SameSite=None.', errors)
+    check(cookie?.path === '/', 'Session cookie must use Path=/.', errors)
+    check(cookie?.deleted === false, 'Login cookie must not be a deletion cookie.', errors)
+    return errors
+  }
+}
+
+function currentProfileValidation({ employeeId, username, phoneNumber, role }) {
+  return (body) => {
+    const errors = []
+    const profile = isRecord(body) && isRecord(body.profile) ? body.profile : null
+    check(Boolean(profile), 'profile is required.', errors)
+    if (!profile) return errors
+    check(profile.employee_id === employeeId, 'Authenticated employee_id changed.', errors)
+    check(profile.username === username, 'Authenticated username changed.', errors)
+    check(profile.phone_number === phoneNumber, 'Authenticated phone number changed.', errors)
+    check(profile.role === role, 'Authenticated role changed.', errors)
+    return errors
+  }
+}
+
+async function createPendingAccount({ ownerClient, reporter, config, fixture }) {
   const body = await expectApiStep({
-    client,
+    client: ownerClient,
     reporter,
     name: `${fixture.label}: owner creates pending account`,
     url: `${config.apiUrl}/owner/createAccount`,
     options: {
       method: 'POST',
-      headers: ownerHeaders,
       json: {
         name: fixture.pendingUsername,
         phone_number: fixture.phoneNumber,
@@ -178,9 +212,9 @@ async function createPendingAccount({ client, reporter, config, ownerHeaders, fi
   return body.activation_code
 }
 
-async function verifyActivation({ client, reporter, config, fixture, activationCode }) {
+async function verifyActivation({ publicClient, reporter, config, fixture, activationCode }) {
   const body = await expectApiStep({
-    client,
+    client: publicClient,
     reporter,
     name: `${fixture.label}: activation code verifies`,
     url: `${config.apiUrl}/employee/account/activate`,
@@ -218,9 +252,9 @@ function credentialsPayload(fixture, setupToken, workingHours = validWorkingHour
   }
 }
 
-async function submitValidCredentials({ client, reporter, config, fixture, setupToken }) {
+async function submitValidCredentials({ publicClient, reporter, config, fixture, setupToken }) {
   await expectApiStep({
-    client,
+    client: publicClient,
     reporter,
     name: `${fixture.label}: valid credentials complete activation`,
     url: `${config.apiUrl}/employee/account/credentials`,
@@ -244,13 +278,13 @@ async function createActiveEmployee(context, fixture) {
   await submitValidCredentials({ ...context, fixture, setupToken })
 }
 
-async function deactivateEmployee({ client, reporter, config, ownerHeaders, fixture }) {
+async function deactivateEmployee({ ownerClient, reporter, config, fixture }) {
   await expectApiStep({
-    client,
+    client: ownerClient,
     reporter,
     name: `${fixture.label}: owner deactivates employee`,
     url: `${config.apiUrl}/owner/account/deactivate?employee_id=${encodeURIComponent(fixture.employeeId)}`,
-    options: { method: 'POST', headers: ownerHeaders },
+    options: { method: 'POST' },
     expectedStatus: 200,
     validate: (body) => {
       const errors = []
@@ -262,13 +296,13 @@ async function deactivateEmployee({ client, reporter, config, ownerHeaders, fixt
   })
 }
 
-async function startReactivation({ client, reporter, config, ownerHeaders, fixture }) {
+async function startReactivation({ ownerClient, reporter, config, fixture }) {
   const body = await expectApiStep({
-    client,
+    client: ownerClient,
     reporter,
     name: `${fixture.label}: owner starts reactivation`,
     url: `${config.apiUrl}/owner/account/reactivation/start?employee_id=${encodeURIComponent(fixture.employeeId)}`,
-    options: { method: 'POST', headers: ownerHeaders },
+    options: { method: 'POST' },
     expectedStatus: 200,
     allowedSensitiveKeys: ['reactivation_code'],
     validate: (body) => {
@@ -285,9 +319,9 @@ async function startReactivation({ client, reporter, config, ownerHeaders, fixtu
   return body.reactivation_code
 }
 
-async function verifyReactivation({ client, reporter, config, fixture, reactivationCode }) {
+async function verifyReactivation({ publicClient, reporter, config, fixture, reactivationCode }) {
   const body = await expectApiStep({
-    client,
+    client: publicClient,
     reporter,
     name: `${fixture.label}: reactivation code verifies`,
     url: `${config.apiUrl}/employee/account/activate`,
@@ -317,24 +351,38 @@ function wrongCodeFor(realCode) {
   return realCode === 'WRONG000' ? 'WRONG001' : 'WRONG000'
 }
 
-async function logoutOwner({ client, reporter, config, token }) {
-  if (!token) {
-    reporter.skip('Owner logout', { reason: 'No owner token was created.' })
+async function logoutOwner({ ownerClient, reporter, config }) {
+  if (!ownerClient.hasSessionCookie()) {
+    reporter.skip('Owner logout', { reason: 'No owner session cookie was created.' })
     return
   }
 
-  const result = await client.request(`${config.apiUrl}/employee/auth/logout`, {
+  const result = await ownerClient.request(`${config.apiUrl}/employee/auth/logout`, {
     method: 'POST',
-    json: {
-      username: config.owner.username,
-      phone_number: config.owner.phoneNumber,
-      token,
-    },
   })
-  if (result.status === 200 && result.body?.success === true) {
+  const cookie = result.cookieMetadata
+  if (
+    result.status === 200
+    && isRecord(result.body)
+    && result.body.success === true
+    && Object.keys(result.body).length === 1
+    && cookie?.name === '__Host-aurora_session'
+    && cookie.deleted === true
+    && !ownerClient.hasSessionCookie()
+  ) {
     reporter.pass('Owner logout', { path: '/employee/auth/logout', httpStatus: 200 })
   } else {
     reporter.fail('Owner logout', safeResultDetails(result))
+  }
+
+  const afterLogout = await ownerClient.request(`${config.apiUrl}/owner/accounts/created`)
+  if (afterLogout.status === 401) {
+    reporter.pass('Owner session is rejected after logout', {
+      path: '/owner/accounts/created',
+      httpStatus: 401,
+    })
+  } else {
+    reporter.fail('Owner session is rejected after logout', safeResultDetails(afterLogout))
   }
 }
 
@@ -364,7 +412,18 @@ async function main() {
     return
   }
 
-  const client = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose })
+  const publicClient = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose })
+  const ownerClient = createApiClient({
+    timeoutMs: config.timeoutMs,
+    verbose: config.flags.verbose,
+    cookieSession: true,
+  })
+  const employeeClient = createApiClient({
+    timeoutMs: config.timeoutMs,
+    verbose: config.flags.verbose,
+    cookieSession: true,
+  })
+  const attackClient = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose })
   const databaseClient = createSupabaseReadClient({
     enabled: config.flags.dbCheck,
     supabaseUrl: config.supabase?.url,
@@ -384,13 +443,10 @@ async function main() {
     shared: createFixture(config, 'shared'),
     reactivationRevoked: createFixture(config, 'reactivation_revoked'),
   }
-  let ownerToken = null
-  let ownerHeaders = null
-
   try {
     reporter.section('Owner authentication')
-    const ownerAuth = await expectApiStep({
-      client,
+    await expectApiStep({
+      client: ownerClient,
       reporter,
       name: 'Dedicated owner authenticates',
       url: `${config.apiUrl}/employee/auth`,
@@ -404,26 +460,12 @@ async function main() {
         },
       },
       expectedStatus: 200,
-      allowedSensitiveKeys: ['token'],
-      validate: (body) => {
-        const errors = []
-        check(body?.allowed === true, 'allowed must be true.', errors)
-        check(isNonEmptyString(body?.token), 'token is required.', errors)
-        check(isNonEmptyString(body?.expires_at), 'expires_at is required.', errors)
-        check(body?.role === 'OWNER', 'role must be OWNER.', errors)
-        return errors
-      },
-    })
-    ownerToken = ownerAuth.token
-    ownerHeaders = buildOwnerHeaders({
-      username: config.owner.username,
-      phoneNumber: config.owner.phoneNumber,
-      token: ownerToken,
+      validate: authValidation('OWNER', ownerClient),
     })
 
     await runScenario(reporter, 'Missing owner authentication', async () => {
       await expectApiStep({
-        client,
+        client: attackClient,
         reporter,
         name: 'Owner endpoint rejects missing authentication',
         url: `${config.apiUrl}/owner/accounts/created`,
@@ -431,18 +473,26 @@ async function main() {
       })
     })
 
-    await runScenario(reporter, 'Invalid owner token', async () => {
-      const invalidHeaders = buildOwnerHeaders({
-        username: config.owner.username,
-        phoneNumber: config.owner.phoneNumber,
-        token: 'fabricated-negative-test-token',
-      })
+    await runScenario(reporter, 'Malformed session cookie', async () => {
       await expectApiStep({
-        client,
+        client: attackClient,
         reporter,
-        name: 'Owner endpoint rejects fabricated token',
+        name: 'Owner endpoint rejects malformed session cookie',
         url: `${config.apiUrl}/owner/accounts/created`,
-        options: { headers: invalidHeaders },
+        options: { headers: { Cookie: '__Host-aurora_session=malformed' } },
+        expectedStatus: 401,
+      })
+    })
+
+    await runScenario(reporter, 'Fabricated employee ID and token cookie', async () => {
+      await expectApiStep({
+        client: attackClient,
+        reporter,
+        name: 'Owner endpoint rejects fabricated cookie identity and token',
+        url: `${config.apiUrl}/owner/accounts/created`,
+        options: {
+          headers: { Cookie: '__Host-aurora_session=ID-fabricated.fabricated-negative-test-token' },
+        },
         expectedStatus: 401,
       })
     })
@@ -450,36 +500,15 @@ async function main() {
     const profileRejectionCases = [
       { name: 'Profile endpoint rejects missing authentication' },
       {
-        name: 'Profile endpoint rejects a fabricated token',
-        headers: buildOwnerHeaders({
-          username: config.owner.username,
-          phoneNumber: config.owner.phoneNumber,
-          token: 'fabricated-profile-test-token',
-        }),
-      },
-      {
-        name: 'Profile endpoint rejects a mismatched username',
-        headers: buildOwnerHeaders({
-          username: `${config.owner.username}_mismatch`,
-          phoneNumber: config.owner.phoneNumber,
-          token: ownerToken,
-        }),
+        name: 'Profile endpoint rejects a fabricated session cookie',
+        headers: { Cookie: '__Host-aurora_session=ID-fabricated.fabricated-profile-test-token' },
       },
     ]
-    const replacementDigit = config.owner.phoneNumber.endsWith('0') ? '1' : '0'
-    profileRejectionCases.push({
-      name: 'Profile endpoint rejects a mismatched phone number',
-      headers: buildOwnerHeaders({
-        username: config.owner.username,
-        phoneNumber: `${config.owner.phoneNumber.slice(0, -1)}${replacementDigit}`,
-        token: ownerToken,
-      }),
-    })
 
     for (const rejectionCase of profileRejectionCases) {
       await runScenario(reporter, rejectionCase.name, async () => {
         await expectApiStep({
-          client,
+          client: attackClient,
           reporter,
           name: rejectionCase.name,
           url: `${config.apiUrl}/employee/admin/employee/profile`,
@@ -492,15 +521,14 @@ async function main() {
 
     await runScenario(reporter, 'Duplicate pending account', async () => {
       const fixture = fixtures.duplicate
-      await createPendingAccount({ client, reporter, config, ownerHeaders, fixture })
+      await createPendingAccount({ ownerClient, reporter, config, fixture })
       await expectApiStep({
-        client,
+        client: ownerClient,
         reporter,
         name: 'Duplicate pending identity is rejected',
         url: `${config.apiUrl}/owner/createAccount`,
         options: {
           method: 'POST',
-          headers: ownerHeaders,
           json: {
             name: fixture.pendingUsername,
             phone_number: fixture.phoneNumber,
@@ -511,11 +539,10 @@ async function main() {
       })
 
       const pendingRows = await expectApiStep({
-        client,
+        client: ownerClient,
         reporter,
         name: 'Pending list contains one matching identity',
         url: `${config.apiUrl}/owner/accounts/pending`,
-        options: { headers: ownerHeaders },
         expectedStatus: 200,
         validate: (body) => {
           const errors = []
@@ -541,12 +568,12 @@ async function main() {
 
     await runScenario(reporter, 'Activation-code attempt limit', async () => {
       const fixture = fixtures.activationRevoked
-      const activationCode = await createPendingAccount({ client, reporter, config, ownerHeaders, fixture })
+      const activationCode = await createPendingAccount({ ownerClient, reporter, config, fixture })
       const wrongCode = wrongCodeFor(activationCode)
 
       for (let attempt = 1; attempt <= 5; attempt += 1) {
         await expectApiStep({
-          client,
+          client: publicClient,
           reporter,
           name: `${fixture.label}: incorrect activation attempt ${attempt} is rejected`,
           url: `${config.apiUrl}/employee/account/activate`,
@@ -594,8 +621,8 @@ async function main() {
 
     await runScenario(reporter, 'Working-hours and reactivation safeguards', async () => {
       const fixture = fixtures.shared
-      const activationCode = await createPendingAccount({ client, reporter, config, ownerHeaders, fixture })
-      const setupToken = await verifyActivation({ client, reporter, config, fixture, activationCode })
+      const activationCode = await createPendingAccount({ ownerClient, reporter, config, fixture })
+      const setupToken = await verifyActivation({ publicClient, reporter, config, fixture, activationCode })
       const invalidSchedules = [
         {
           label: 'duplicate day_of_week',
@@ -627,7 +654,7 @@ async function main() {
 
       for (const invalidSchedule of invalidSchedules) {
         await expectApiStep({
-          client,
+          client: publicClient,
           reporter,
           name: `Credentials reject ${invalidSchedule.label}`,
           url: `${config.apiUrl}/employee/account/credentials`,
@@ -665,7 +692,7 @@ async function main() {
         })
       }
 
-      await submitValidCredentials({ client, reporter, config, fixture, setupToken })
+      await submitValidCredentials({ publicClient, reporter, config, fixture, setupToken })
       if (databaseClient.enabled) {
         await assertEmployeeActiveState({
           client: databaseClient,
@@ -682,11 +709,76 @@ async function main() {
       }
 
       await expectApiStep({
-        client,
+        client: employeeClient,
+        reporter,
+        name: 'Disposable employee authenticates with a cookie session',
+        url: `${config.apiUrl}/employee/auth`,
+        options: {
+          method: 'POST',
+          json: {
+            username: fixture.activeUsername,
+            phone_number: fixture.phoneNumber,
+            password: fixture.initialPassword,
+            valid_time: config.owner.validTime,
+          },
+        },
+        expectedStatus: 200,
+        validate: authValidation(config.testEmployeeRole, employeeClient),
+      })
+
+      await expectApiStep({
+        client: attackClient,
+        reporter,
+        name: 'Valid employee ID with fabricated token is rejected',
+        url: `${config.apiUrl}/employee/admin/employee/profile`,
+        options: {
+          headers: {
+            Cookie: `__Host-aurora_session=${fixture.employeeId}.fabricated-negative-test-token`,
+          },
+        },
+        expectedStatus: 401,
+        validate: profileRejectionValidation,
+      })
+
+      const employeeProfileValidation = currentProfileValidation({
+        employeeId: fixture.employeeId,
+        username: fixture.activeUsername,
+        phoneNumber: fixture.phoneNumber,
+        role: config.testEmployeeRole,
+      })
+      const profileSpoofingCases = [
+        {
+          name: 'Spoofed role header cannot elevate employee profile',
+          url: `${config.apiUrl}/employee/admin/employee/profile`,
+          headers: { 'X-Employee-Role': 'OWNER' },
+        },
+        {
+          name: 'Role query cannot elevate employee profile',
+          url: `${config.apiUrl}/employee/admin/employee/profile?role=OWNER`,
+        },
+        {
+          name: 'Employee ID query cannot select another profile',
+          url: `${config.apiUrl}/employee/admin/employee/profile?employee_id=ID-fabricated-other-user`,
+        },
+      ]
+      for (const spoofingCase of profileSpoofingCases) {
+        await expectApiStep({
+          client: employeeClient,
+          reporter,
+          name: spoofingCase.name,
+          url: spoofingCase.url,
+          options: spoofingCase.headers ? { headers: spoofingCase.headers } : {},
+          expectedStatus: 200,
+          validate: employeeProfileValidation,
+        })
+      }
+
+      await expectApiStep({
+        client: ownerClient,
         reporter,
         name: 'Active employee cannot start reactivation',
         url: `${config.apiUrl}/owner/account/reactivation/start?employee_id=${encodeURIComponent(fixture.employeeId)}`,
-        options: { method: 'POST', headers: ownerHeaders },
+        options: { method: 'POST' },
         expectedStatus: 409,
       })
       if (databaseClient.enabled) {
@@ -707,14 +799,15 @@ async function main() {
         })
       }
 
-      await deactivateEmployee({ client, reporter, config, ownerHeaders, fixture })
-      const reactivationCode = await startReactivation({ client, reporter, config, ownerHeaders, fixture })
+      await deactivateEmployee({ ownerClient, reporter, config, fixture })
+      employeeClient.clearSessionCookie()
+      const reactivationCode = await startReactivation({ ownerClient, reporter, config, fixture })
       await expectApiStep({
-        client,
+        client: ownerClient,
         reporter,
         name: 'Duplicate unfinished reactivation is rejected',
         url: `${config.apiUrl}/owner/account/reactivation/start?employee_id=${encodeURIComponent(fixture.employeeId)}`,
-        options: { method: 'POST', headers: ownerHeaders },
+        options: { method: 'POST' },
         expectedStatus: 409,
       })
       if (databaseClient.enabled) {
@@ -736,14 +829,14 @@ async function main() {
       }
 
       const reactivationSetupToken = await verifyReactivation({
-        client,
+        publicClient,
         reporter,
         config,
         fixture,
         reactivationCode,
       })
       await expectApiStep({
-        client,
+        client: publicClient,
         reporter,
         name: 'Reactivation rejects mismatched passwords',
         url: `${config.apiUrl}/employee/account/reactivation/credentials`,
@@ -776,7 +869,7 @@ async function main() {
       }
 
       await expectApiStep({
-        client,
+        client: publicClient,
         reporter,
         name: 'Matching password completes reactivation fixture',
         url: `${config.apiUrl}/employee/account/reactivation/credentials`,
@@ -802,14 +895,14 @@ async function main() {
 
     await runScenario(reporter, 'Reactivation-code attempt limit', async () => {
       const fixture = fixtures.reactivationRevoked
-      await createActiveEmployee({ client, reporter, config, ownerHeaders }, fixture)
-      await deactivateEmployee({ client, reporter, config, ownerHeaders, fixture })
-      const reactivationCode = await startReactivation({ client, reporter, config, ownerHeaders, fixture })
+      await createActiveEmployee({ ownerClient, publicClient, reporter, config }, fixture)
+      await deactivateEmployee({ ownerClient, reporter, config, fixture })
+      const reactivationCode = await startReactivation({ ownerClient, reporter, config, fixture })
       const wrongCode = wrongCodeFor(reactivationCode)
 
       for (let attempt = 1; attempt <= 5; attempt += 1) {
         await expectApiStep({
-          client,
+          client: publicClient,
           reporter,
           name: `${fixture.label}: incorrect reactivation attempt ${attempt} is rejected`,
           url: `${config.apiUrl}/employee/account/activate`,
@@ -868,7 +961,7 @@ async function main() {
     }
   } finally {
     reporter.section('Session cleanup')
-    await logoutOwner({ client, reporter, config, token: ownerToken })
+    await logoutOwner({ ownerClient, reporter, config })
 
     reporter.section('Manual data cleanup')
     reporter.skip('Automatic database cleanup is intentionally unavailable', {

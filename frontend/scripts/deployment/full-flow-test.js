@@ -1,5 +1,4 @@
 import {
-  buildOwnerHeaders,
   createApiClient,
   findSensitiveResponseKeys,
   redact,
@@ -23,7 +22,7 @@ const workingHours = Object.freeze([
   Object.freeze({ day_of_week: 4, start_minute: 480, end_minute: 960, working_status: true }),
 ])
 
-const forbiddenResponseKeyPattern = /password|hash|salt|lookup|setup[_-]?token|token[_-]?salt|activation[_-]?code|reactivation[_-]?code/i
+const forbiddenResponseKeyPattern = /password|hash|salt|lookup|setup[_-]?token|token[_-]?salt|activation[_-]?code|reactivation[_-]?code|(^|[_-])token($|[_-])/i
 const safeExpiryMetadataKeys = new Set(['setup_token_expiry_time', 'setup_token_expires_at'])
 
 class FlowAbort extends Error {
@@ -168,15 +167,27 @@ async function expectApiStep({
   return result.body
 }
 
-function authValidation(expectedRole) {
+function authValidation(expectedRole, sessionClient) {
   return (body) => {
     const errors = []
     check(isRecord(body), 'Response must be an object.', errors)
     if (!isRecord(body)) return errors
     check(body.allowed === true, 'allowed must be true.', errors)
-    check(isNonEmptyString(body.token), 'token is required.', errors)
     check(isNonEmptyString(body.expires_at), 'expires_at is required.', errors)
+    check(!Number.isNaN(Date.parse(body.expires_at)), 'expires_at must be valid.', errors)
     check(body.role === expectedRole, `role must be ${expectedRole}.`, errors)
+    check(!Object.prototype.hasOwnProperty.call(body, 'token'), 'Response must not contain token.', errors)
+    check(!Object.prototype.hasOwnProperty.call(body, 'employee_id'), 'Response must not contain employee_id.', errors)
+
+    const sessionFlags = sessionClient.getLastCookieMetadata()
+    check(sessionClient.hasSessionCookie(), 'Session cookie was not captured.', errors)
+    check(sessionFlags?.received === true, 'Session cookie metadata is missing.', errors)
+    check(sessionFlags?.name === '__Host-aurora_session', 'Session cookie name is invalid.', errors)
+    check(sessionFlags?.httpOnly === true, 'Session cookie must be HttpOnly.', errors)
+    check(sessionFlags?.secure === true, 'Session cookie must be Secure.', errors)
+    check(sessionFlags?.sameSite === 'none', 'Session cookie must use SameSite=None.', errors)
+    check(sessionFlags?.path === '/', 'Session cookie path must be /.', errors)
+    check(sessionFlags?.deleted === false, 'Login cookie must not be a deletion cookie.', errors)
     return errors
   }
 }
@@ -187,20 +198,42 @@ function containsAccount(rows, { idKey, id, username }) {
   ))
 }
 
-async function logout({ client, reporter, apiUrl, username, phoneNumber, token, label }) {
-  if (!token) {
-    reporter.skip(`${label} logout`, { reason: 'No token was created.' })
+async function logout({ client, reporter, apiUrl, protectedPath, label }) {
+  if (!client.hasSessionCookie()) {
+    reporter.skip(`${label} logout`, { reason: 'No session cookie was created.' })
     return
   }
 
   const result = await client.request(`${apiUrl}/employee/auth/logout`, {
     method: 'POST',
-    json: { username, phone_number: phoneNumber, token },
   })
-  if (result.status === 200 && result.body?.success === true) {
-    reporter.pass(`${label} logout`, { path: '/employee/auth/logout', httpStatus: 200 })
+  const sessionFlags = result.cookieMetadata
+  const bodyIsExact = isRecord(result.body)
+    && result.body.success === true
+    && Object.keys(result.body).length === 1
+  if (
+    result.status === 200
+    && bodyIsExact
+    && sessionFlags?.deleted === true
+    && !client.hasSessionCookie()
+  ) {
+    reporter.pass(`${label} logout`, {
+      path: '/employee/auth/logout',
+      httpStatus: 200,
+      sessionFlags,
+    })
   } else {
     reporter.fail(`${label} logout`, safeResultDetails(result))
+  }
+
+  const afterLogout = await client.request(`${apiUrl}${protectedPath}`)
+  if (afterLogout.status === 401) {
+    reporter.pass(`${label} session is rejected after logout`, {
+      path: protectedPath,
+      httpStatus: 401,
+    })
+  } else {
+    reporter.fail(`${label} session is rejected after logout`, safeResultDetails(afterLogout))
   }
 }
 
@@ -242,7 +275,9 @@ async function main() {
     return
   }
 
-  const client = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose })
+  const publicClient = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose })
+  const ownerClient = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose, cookieSession: true })
+  const employeeClient = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose, cookieSession: true })
   const databaseClient = createSupabaseReadClient({
     enabled: config.flags.dbCheck,
     supabaseUrl: config.supabase?.url,
@@ -269,14 +304,12 @@ async function main() {
     employeeId: null,
     ownerEmployeeId: null,
     reactivationId: null,
-    ownerToken: null,
-    employeeToken: null,
   }
 
   try {
     reporter.section('Owner authentication')
-    const ownerAuth = await expectApiStep({
-      client,
+    await expectApiStep({
+      client: ownerClient,
       reporter,
       name: 'Owner authentication succeeds',
       url: `${config.apiUrl}/employee/auth`,
@@ -290,21 +323,14 @@ async function main() {
         },
       },
       expectedStatus: 200,
-      validate: authValidation('OWNER'),
-    })
-    state.ownerToken = ownerAuth.token
-    const ownerHeaders = buildOwnerHeaders({
-      username: config.owner.username,
-      phoneNumber: config.owner.phoneNumber,
-      token: state.ownerToken,
+      validate: authValidation('OWNER', ownerClient),
     })
 
     const ownerProfile = await expectApiStep({
-      client,
+      client: ownerClient,
       reporter,
       name: 'Owner loads their current profile safely',
       url: `${config.apiUrl}/employee/admin/employee/profile`,
-      options: { headers: ownerHeaders },
       expectedStatus: 200,
       validate: currentProfileValidation({
         employeeId: null,
@@ -318,13 +344,12 @@ async function main() {
 
     reporter.section('Account creation')
     const created = await expectApiStep({
-      client,
+      client: ownerClient,
       reporter,
       name: 'Owner creates pending employee account',
       url: `${config.apiUrl}/owner/createAccount`,
       options: {
         method: 'POST',
-        headers: ownerHeaders,
         json: {
           name: testData.pendingUsername,
           phone_number: testData.phoneNumber,
@@ -359,11 +384,10 @@ async function main() {
     })
 
     const pendingList = await expectApiStep({
-      client,
+      client: ownerClient,
       reporter,
       name: 'Pending account appears in owner list',
       url: `${config.apiUrl}/owner/accounts/pending`,
-      options: { headers: ownerHeaders },
       expectedStatus: 200,
       validate: (body) => {
         const errors = []
@@ -383,11 +407,10 @@ async function main() {
     void pendingList
 
     await expectApiStep({
-      client,
+      client: ownerClient,
       reporter,
       name: 'Pending employee profile is correct',
       url: `${config.apiUrl}/owner/accounts/pending/${encodeURIComponent(state.accountId)}`,
-      options: { headers: ownerHeaders },
       expectedStatus: 200,
       validate: (body) => {
         const errors = []
@@ -405,7 +428,7 @@ async function main() {
 
     reporter.section('Normal activation')
     const activation = await expectApiStep({
-      client,
+      client: publicClient,
       reporter,
       name: 'Employee activation code verifies',
       url: `${config.apiUrl}/employee/account/activate`,
@@ -440,7 +463,7 @@ async function main() {
     })
 
     await expectApiStep({
-      client,
+      client: publicClient,
       reporter,
       name: 'Credentials and working hours are saved',
       url: `${config.apiUrl}/employee/account/credentials`,
@@ -469,8 +492,8 @@ async function main() {
     })
 
     reporter.section('Activated employee')
-    const employeeAuth = await expectApiStep({
-      client,
+    await expectApiStep({
+      client: employeeClient,
       reporter,
       name: 'Activated employee authenticates',
       url: `${config.apiUrl}/employee/auth`,
@@ -484,16 +507,14 @@ async function main() {
         },
       },
       expectedStatus: 200,
-      validate: authValidation(config.testEmployeeRole),
+      validate: authValidation(config.testEmployeeRole, employeeClient),
     })
-    state.employeeToken = employeeAuth.token
 
     const pendingAfterActivation = await expectApiStep({
-      client,
+      client: ownerClient,
       reporter,
       name: 'Activated account leaves pending list',
       url: `${config.apiUrl}/owner/accounts/pending`,
-      options: { headers: ownerHeaders },
       expectedStatus: 200,
       validate: (body) => {
         const errors = []
@@ -522,11 +543,10 @@ async function main() {
     })
 
     const createdList = await expectApiStep({
-      client,
+      client: ownerClient,
       reporter,
       name: 'Activated employee appears in created list',
       url: `${config.apiUrl}/owner/accounts/created`,
-      options: { headers: ownerHeaders },
       expectedStatus: 200,
       validate: (body) => {
         const errors = []
@@ -563,11 +583,6 @@ async function main() {
       expectedIntervals: workingHours,
     })
 
-    const employeeHeaders = buildOwnerHeaders({
-      username: testData.activeUsername,
-      phoneNumber: testData.phoneNumber,
-      token: state.employeeToken,
-    })
     const employeeProfileValidation = currentProfileValidation({
       employeeId: state.employeeId,
       username: testData.activeUsername,
@@ -577,11 +592,10 @@ async function main() {
     })
 
     await expectApiStep({
-      client,
+      client: employeeClient,
       reporter,
       name: 'Employee loads their current profile and working hours',
       url: `${config.apiUrl}/employee/admin/employee/profile`,
-      options: { headers: employeeHeaders },
       expectedStatus: 200,
       validate: employeeProfileValidation,
     })
@@ -590,37 +604,34 @@ async function main() {
       {
         name: 'Spoofed role header cannot change the employee profile',
         url: `${config.apiUrl}/employee/admin/employee/profile`,
-        headers: { ...employeeHeaders, 'X-Employee-Role': 'OWNER' },
+        headers: { 'X-Employee-Role': 'OWNER' },
       },
       {
         name: 'Role query cannot change the employee profile',
         url: `${config.apiUrl}/employee/admin/employee/profile?role=OWNER`,
-        headers: employeeHeaders,
       },
       {
         name: 'Employee ID query cannot select another profile',
         url: `${config.apiUrl}/employee/admin/employee/profile?employee_id=${encodeURIComponent(state.ownerEmployeeId)}`,
-        headers: employeeHeaders,
       },
     ]
     for (const spoofingCheck of profileSpoofingChecks) {
       await expectApiStep({
-        client,
+        client: employeeClient,
         reporter,
         name: spoofingCheck.name,
         url: spoofingCheck.url,
-        options: { headers: spoofingCheck.headers },
+        options: spoofingCheck.headers ? { headers: spoofingCheck.headers } : {},
         expectedStatus: 200,
         validate: employeeProfileValidation,
       })
     }
 
     const createdProfile = await expectApiStep({
-      client,
+      client: ownerClient,
       reporter,
       name: 'Created employee profile is active and correct',
       url: `${config.apiUrl}/owner/accounts/created/${encodeURIComponent(state.employeeId)}`,
-      options: { headers: ownerHeaders },
       expectedStatus: 200,
       validate: (body) => {
         const errors = []
@@ -639,21 +650,21 @@ async function main() {
 
     reporter.section('Deactivation and reactivation')
     await expectApiStep({
-      client,
+      client: ownerClient,
       reporter,
       name: 'Reactivation is rejected while employee is active',
       url: `${config.apiUrl}/owner/account/reactivation/start?employee_id=${encodeURIComponent(state.employeeId)}`,
-      options: { method: 'POST', headers: ownerHeaders },
+      options: { method: 'POST' },
       expectedStatus: 409,
       validate: () => [],
     })
 
     await expectApiStep({
-      client,
+      client: ownerClient,
       reporter,
       name: 'Owner deactivates employee',
       url: `${config.apiUrl}/owner/account/deactivate?employee_id=${encodeURIComponent(state.employeeId)}`,
-      options: { method: 'POST', headers: ownerHeaders },
+      options: { method: 'POST' },
       expectedStatus: 200,
       validate: (body) => {
         const errors = []
@@ -665,7 +676,7 @@ async function main() {
         return errors
       },
     })
-    state.employeeToken = null
+    employeeClient.clearSessionCookie()
 
     await assertEmployeeActiveState({
       client: databaseClient,
@@ -675,11 +686,10 @@ async function main() {
     })
 
     await expectApiStep({
-      client,
+      client: ownerClient,
       reporter,
       name: 'Created employee profile becomes inactive',
       url: `${config.apiUrl}/owner/accounts/created/${encodeURIComponent(state.employeeId)}`,
-      options: { headers: ownerHeaders },
       expectedStatus: 200,
       validate: (body) => {
         const errors = []
@@ -691,11 +701,11 @@ async function main() {
     })
 
     const reactivation = await expectApiStep({
-      client,
+      client: ownerClient,
       reporter,
       name: 'Owner starts employee reactivation',
       url: `${config.apiUrl}/owner/account/reactivation/start?employee_id=${encodeURIComponent(state.employeeId)}`,
-      options: { method: 'POST', headers: ownerHeaders },
+      options: { method: 'POST' },
       expectedStatus: 200,
       allowedSensitiveKeys: ['reactivation_code'],
       validate: (body) => {
@@ -732,11 +742,10 @@ async function main() {
     })
 
     await expectApiStep({
-      client,
+      client: ownerClient,
       reporter,
       name: 'Created profile exposes safe pending reactivation state',
       url: `${config.apiUrl}/owner/accounts/created/${encodeURIComponent(state.employeeId)}`,
-      options: { headers: ownerHeaders },
       expectedStatus: 200,
       validate: (body) => {
         const errors = []
@@ -761,7 +770,7 @@ async function main() {
     })
 
     const verifiedReactivation = await expectApiStep({
-      client,
+      client: publicClient,
       reporter,
       name: 'Employee reactivation code verifies',
       url: `${config.apiUrl}/employee/account/activate`,
@@ -797,7 +806,7 @@ async function main() {
     })
 
     await expectApiStep({
-      client,
+      client: publicClient,
       reporter,
       name: 'Employee renews password and completes reactivation',
       url: `${config.apiUrl}/employee/account/reactivation/credentials`,
@@ -836,8 +845,8 @@ async function main() {
       expectedStatus: 'COMPLETED',
     })
 
-    const renewedAuth = await expectApiStep({
-      client,
+    await expectApiStep({
+      client: employeeClient,
       reporter,
       name: 'Reactivated employee authenticates with renewed password',
       url: `${config.apiUrl}/employee/auth`,
@@ -851,9 +860,8 @@ async function main() {
         },
       },
       expectedStatus: 200,
-      validate: authValidation(config.testEmployeeRole),
+      validate: authValidation(config.testEmployeeRole, employeeClient),
     })
-    state.employeeToken = renewedAuth.token
   } catch (error) {
     if (!(error instanceof FlowAbort)) {
       reporter.fail('Unexpected full-flow script error', {
@@ -863,21 +871,17 @@ async function main() {
   } finally {
     reporter.section('Session cleanup')
     await logout({
-      client,
+      client: employeeClient,
       reporter,
       apiUrl: config.apiUrl,
-      username: testData.activeUsername,
-      phoneNumber: testData.phoneNumber,
-      token: state.employeeToken,
+      protectedPath: '/employee/admin/employee/profile',
       label: 'Employee',
     })
     await logout({
-      client,
+      client: ownerClient,
       reporter,
       apiUrl: config.apiUrl,
-      username: config.owner.username,
-      phoneNumber: config.owner.phoneNumber,
-      token: state.ownerToken,
+      protectedPath: '/owner/accounts/created',
       label: 'Owner',
     })
 
