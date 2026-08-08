@@ -417,11 +417,13 @@ async function main() {
     timeoutMs: config.timeoutMs,
     verbose: config.flags.verbose,
     cookieSession: true,
+    requestOrigin: config.frontendOrigin,
   })
   const employeeClient = createApiClient({
     timeoutMs: config.timeoutMs,
     verbose: config.flags.verbose,
     cookieSession: true,
+    requestOrigin: config.frontendOrigin,
   })
   const attackClient = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose })
   const databaseClient = createSupabaseReadClient({
@@ -445,6 +447,36 @@ async function main() {
   }
   try {
     reporter.section('Owner authentication')
+
+    const csrfLoginBody = {
+      username: 'csrf_origin_probe',
+      phone_number: '01900000000',
+      password: 'not-a-real-password',
+      valid_time: config.owner.validTime,
+    }
+    await runScenario(reporter, 'Login CSRF protection', async () => {
+      await expectApiStep({
+        client: attackClient,
+        reporter,
+        name: 'Login rejects missing Origin',
+        url: `${config.apiUrl}/employee/auth`,
+        options: { method: 'POST', json: csrfLoginBody },
+        expectedStatus: 403,
+      })
+      await expectApiStep({
+        client: attackClient,
+        reporter,
+        name: 'Login rejects malicious Origin',
+        url: `${config.apiUrl}/employee/auth`,
+        options: {
+          method: 'POST',
+          headers: { Origin: 'https://malicious.example' },
+          json: csrfLoginBody,
+        },
+        expectedStatus: 403,
+      })
+    })
+
     await expectApiStep({
       client: ownerClient,
       reporter,
@@ -461,6 +493,41 @@ async function main() {
       },
       expectedStatus: 200,
       validate: authValidation('OWNER', ownerClient),
+    })
+
+    await runScenario(reporter, 'Authenticated CSRF status distinction', async () => {
+      const protectedMutationUrl = `${config.apiUrl}/owner/account/deactivate?employee_id=ID-fabricated-csrf-probe`
+      await expectApiStep({
+        client: attackClient,
+        reporter,
+        name: 'Trusted Origin with missing cookie is unauthorized',
+        url: protectedMutationUrl,
+        options: { method: 'POST', headers: { Origin: config.frontendOrigin } },
+        expectedStatus: 401,
+      })
+      await expectApiStep({
+        client: attackClient,
+        reporter,
+        name: 'Trusted Origin with fabricated cookie is unauthorized',
+        url: protectedMutationUrl,
+        options: {
+          method: 'POST',
+          headers: {
+            Origin: config.frontendOrigin,
+            Cookie: '__Host-aurora_session=ID-fabricated.fabricated-csrf-token',
+          },
+        },
+        expectedStatus: 401,
+      })
+      await expectApiStep({
+        client: ownerClient,
+        reporter,
+        name: 'Protected GET remains available without Origin',
+        url: `${config.apiUrl}/owner/accounts/created`,
+        options: { suppressRequestOrigin: true },
+        expectedStatus: 200,
+        validate: (body) => Array.isArray(body) ? [] : ['Created account list must be an array.'],
+      })
     })
 
     await runScenario(reporter, 'Missing owner authentication', async () => {
@@ -770,6 +837,46 @@ async function main() {
           options: spoofingCase.headers ? { headers: spoofingCase.headers } : {},
           expectedStatus: 200,
           validate: employeeProfileValidation,
+        })
+      }
+
+      const deactivationUrl = `${config.apiUrl}/owner/account/deactivate?employee_id=${encodeURIComponent(fixture.employeeId)}`
+      await expectApiStep({
+        client: ownerClient,
+        reporter,
+        name: 'Employee deactivation rejects missing Origin',
+        url: deactivationUrl,
+        options: { method: 'POST', suppressRequestOrigin: true },
+        expectedStatus: 403,
+      })
+      if (databaseClient.enabled) {
+        await assertEmployeeActiveState({
+          client: databaseClient,
+          reporter,
+          employeeId: fixture.employeeId,
+          expectedActive: true,
+          name: 'Missing-Origin rejection leaves employee active',
+        })
+      }
+
+      await expectApiStep({
+        client: ownerClient,
+        reporter,
+        name: 'Employee deactivation rejects malicious Origin',
+        url: deactivationUrl,
+        options: {
+          method: 'POST',
+          headers: { Origin: 'https://malicious.example' },
+        },
+        expectedStatus: 403,
+      })
+      if (databaseClient.enabled) {
+        await assertEmployeeActiveState({
+          client: databaseClient,
+          reporter,
+          employeeId: fixture.employeeId,
+          expectedActive: true,
+          name: 'Malicious-Origin rejection leaves employee active',
         })
       }
 

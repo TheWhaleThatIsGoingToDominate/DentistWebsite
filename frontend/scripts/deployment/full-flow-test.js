@@ -276,8 +276,18 @@ async function main() {
   }
 
   const publicClient = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose })
-  const ownerClient = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose, cookieSession: true })
-  const employeeClient = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose, cookieSession: true })
+  const ownerClient = createApiClient({
+    timeoutMs: config.timeoutMs,
+    verbose: config.flags.verbose,
+    cookieSession: true,
+    requestOrigin: config.frontendOrigin,
+  })
+  const employeeClient = createApiClient({
+    timeoutMs: config.timeoutMs,
+    verbose: config.flags.verbose,
+    cookieSession: true,
+    requestOrigin: config.frontendOrigin,
+  })
   const databaseClient = createSupabaseReadClient({
     enabled: config.flags.dbCheck,
     supabaseUrl: config.supabase?.url,

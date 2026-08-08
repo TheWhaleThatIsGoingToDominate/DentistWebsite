@@ -354,6 +354,7 @@ async function main() {
     timeoutMs: config.timeoutMs,
     verbose: config.flags.verbose,
     cookieSession: true,
+    requestOrigin: config.frontendOrigin,
   })
   const databaseClient = createSupabaseReadClient({
     enabled: true,
@@ -549,6 +550,7 @@ async function main() {
       timeoutMs: config.timeoutMs,
       verbose: config.flags.verbose,
       cookieSession: true,
+      requestOrigin: config.frontendOrigin,
     })
     const expiringOwnerAuth = await authenticateOwner(
       { client: expiringOwnerClient, reporter, config },
