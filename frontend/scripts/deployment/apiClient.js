@@ -1,4 +1,5 @@
 const SESSION_COOKIE_NAME = '__Host-aurora_session'
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 const sensitiveKeyPattern = /authorization|cookie|__host-aurora_session|password|secret|api[_-]?key|service[_-]?role|activation[_-]?code|reactivation[_-]?code|setup[_-]?token|hash|salt|lookup|(^|[_-])token($|[_-])/i
 
 function redactString(value) {
@@ -102,7 +103,12 @@ function hasHeader(headers, expectedName) {
   return Object.keys(headers).some((name) => name.toLowerCase() === expectedName.toLowerCase())
 }
 
-export function createApiClient({ timeoutMs = 15_000, verbose = false, cookieSession = false } = {}) {
+export function createApiClient({
+  timeoutMs = 15_000,
+  verbose = false,
+  cookieSession = false,
+  requestOrigin = null,
+} = {}) {
   let sessionCookieValue = null
   let sessionCookieOrigin = null
   let lastCookieMetadata = null
@@ -113,12 +119,24 @@ export function createApiClient({ timeoutMs = 15_000, verbose = false, cookieSes
       headers = {},
       json,
       rawBody,
+      suppressRequestOrigin = false,
     } = options
+    const normalizedMethod = String(method).toUpperCase()
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), timeoutMs)
     const startedAt = Date.now()
     const requestHeaders = { ...headers }
     let body = rawBody
+
+    if (
+      cookieSession
+      && requestOrigin
+      && UNSAFE_METHODS.has(normalizedMethod)
+      && !suppressRequestOrigin
+      && !hasHeader(requestHeaders, 'origin')
+    ) {
+      requestHeaders.Origin = requestOrigin
+    }
 
     if (
       cookieSession
@@ -140,7 +158,7 @@ export function createApiClient({ timeoutMs = 15_000, verbose = false, cookieSes
 
     try {
       const response = await fetch(url, {
-        method,
+        method: normalizedMethod,
         headers: requestHeaders,
         body,
         signal: controller.signal,

@@ -50,6 +50,7 @@ async function main() {
     timeoutMs: config.timeoutMs,
     verbose: config.flags.verbose,
     cookieSession: true,
+    requestOrigin: config.frontendOrigin,
   })
 
   reporter.section('Configuration')
@@ -153,7 +154,10 @@ async function main() {
 
   const malformedAuth = await client.request(`${config.apiUrl}/employee/auth`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Origin: config.frontendOrigin,
+    },
     rawBody: '{"username":',
   })
   if (malformedAuth.status === 422) {
