@@ -1,9 +1,21 @@
-from fastapi import HTTPException, Depends, Cookie
+from fastapi import HTTPException, Depends, Cookie, Request
 from logic.auth.authentication import verify_employee_token
 
+#variables
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+from api.trustedOrigins import TRUSTED_ORIGINS
+def require_trusted_origin(request: Request):
+    if request.method in SAFE_METHODS:
+        return
+    
+    if request.headers.get("origin") not in TRUSTED_ORIGINS:
+        raise HTTPException(status_code=403, detail="invalid origin")
 def require_employee_auth(
-    session_cookie: str | None = Cookie(default=None, alias="__Host-aurora_session")
+    request: Request, session_cookie: str | None = Cookie(default=None, alias="__Host-aurora_session"), 
 ):
+    #validating origin
+    require_trusted_origin(request)
+
     if not session_cookie:
         raise HTTPException(status_code=401, detail="Missing employee token/cookie")
 

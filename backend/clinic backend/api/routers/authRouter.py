@@ -1,7 +1,7 @@
-from fastapi import HTTPException, Header, Depends, APIRouter, Response, Cookie
+from fastapi import HTTPException, Request, Depends, APIRouter, Response, Cookie
 from pydantic import BaseModel
 from logic.auth.authentication import detail_verification, auth, delete_employee_token
-from api.dependencyFunctions import require_employee_auth
+from api.dependencyFunctions import require_employee_auth, require_trusted_origin
 
 router = APIRouter()
 
@@ -29,7 +29,10 @@ class Authentication(BaseModel):
     password: str
     valid_time: int = 30
 @router.post("/employee/auth")
-def authentication(data: Authentication, response: Response):
+def authentication(data: Authentication, response: Response, request: Request):
+    #validating origin
+    require_trusted_origin(request)
+
     try:
         result = auth(data.username, data.phone_number, data.password, data.valid_time)
         employee_id = result.pop("employee_id")
