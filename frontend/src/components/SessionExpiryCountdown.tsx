@@ -36,7 +36,7 @@ export default function SessionExpiryCountdown() {
 
       if (nextRemainingSeconds === 0 && !hasExpired) {
         hasExpired = true
-        void clearEmployeeSessionInBackend(session)
+        void clearEmployeeSessionInBackend()
         clearStoredEmployeeSession()
         window.location.replace('/employee-admin?session=expired')
       }

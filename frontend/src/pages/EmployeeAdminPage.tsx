@@ -242,7 +242,7 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
     }
 
     clearStoredEmployeeSession()
-    void clearEmployeeSessionInBackend(storedSession)
+    void clearEmployeeSessionInBackend()
   }, [hasAccess])
 
   useEffect(() => {
@@ -254,7 +254,7 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
       const storedSession = loadEmployeeSession()
 
       if (storedSession) {
-        void clearEmployeeSessionInBackend(storedSession, { keepalive: true })
+        void clearEmployeeSessionInBackend({ keepalive: true })
       }
     }
 
@@ -373,7 +373,7 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
         })
 
         if (!ignoreResponse) {
-          const allowed = authentication?.allowed === true && Boolean(authentication.token)
+          const allowed = authentication?.allowed === true
           setVerifiedAuthentication(allowed ? authentication : null)
           setPasswordVerificationStatus(allowed ? 'verified' : 'incorrect')
         }
@@ -414,7 +414,7 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
 
     const authentication = verifiedAuthentication
 
-    if (authentication?.allowed !== true || !authentication.token) {
+    if (authentication?.allowed !== true) {
       setAccessError('Invalid employee login')
       setHasAccess(false)
       return
@@ -435,8 +435,6 @@ export default function EmployeeAdminPage({ embeddedSection }: { embeddedSection
     saveEmployeeSession({
       username: trimmedUsername,
       phone_number: trimmedPhoneNumber,
-      token: authentication.token,
-      tokenDuration,
       expires_at: authentication.expires_at,
       role: authentication.role,
     })

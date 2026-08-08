@@ -1,4 +1,4 @@
-import { createApiClient, buildOwnerHeaders, findSensitiveResponseKeys } from './apiClient.js'
+import { createApiClient, findSensitiveResponseKeys } from './apiClient.js'
 import { DeploymentConfigError, loadDeploymentConfig } from './config.js'
 import { DeploymentReporter } from './reporter.js'
 
@@ -46,6 +46,11 @@ async function main() {
 
   const reporter = new DeploymentReporter({ reportPath: config.flags.reportPath })
   const client = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose })
+  const ownerClient = createApiClient({
+    timeoutMs: config.timeoutMs,
+    verbose: config.flags.verbose,
+    cookieSession: true,
+  })
 
   reporter.section('Configuration')
   reporter.pass('Deployment environment is valid', {
@@ -110,7 +115,7 @@ async function main() {
     reporter.fail('Backend is reachable', resultDetails(running))
   }
 
-  const requestedCorsHeaders = ['content-type', 'authorization', 'x-employee-username', 'x-employee-phone']
+  const requestedCorsHeaders = ['content-type']
   const preflight = await client.request(`${config.apiUrl}/employee/auth`, {
     method: 'OPTIONS',
     headers: {
@@ -122,9 +127,11 @@ async function main() {
   const allowedOrigin = preflight.headers['access-control-allow-origin']
   const allowedMethods = preflight.headers['access-control-allow-methods'] || ''
   const allowedHeaders = preflight.headers['access-control-allow-headers'] || ''
+  const allowedCredentials = preflight.headers['access-control-allow-credentials'] || ''
   const corsIsValid =
     preflight.status !== null && preflight.status >= 200 && preflight.status < 300 &&
     allowedOrigin === config.frontendOrigin &&
+    allowedCredentials.toLowerCase() === 'true' &&
     (allowedMethods === '*' || allowedMethods.toUpperCase().split(',').map((value) => value.trim()).includes('POST')) &&
     requestedCorsHeaders.every((header) => includesAllowedHeader(allowedHeaders, header))
 
@@ -138,6 +145,7 @@ async function main() {
     reporter.fail('Backend CORS preflight accepts the frontend origin', {
       ...resultDetails(preflight),
       allowedOrigin,
+      allowedCredentials,
       allowedMethods,
       allowedHeaders,
     })
@@ -156,12 +164,12 @@ async function main() {
 
   reporter.section('Authenticated owner smoke')
   if (!config.flags.write) {
-    reporter.skip('Owner login', { reason: 'Run with --write to permit token creation.' })
+    reporter.skip('Owner login', { reason: 'Run with --write to permit session creation.' })
     reporter.skip('Owner protected account list', { reason: 'Owner login was not permitted.' })
-    reporter.skip('Owner logout', { reason: 'No owner token was created.' })
+    reporter.skip('Owner logout', { reason: 'No owner session was created.' })
+    reporter.skip('Post-logout access rejection', { reason: 'No owner session was created.' })
   } else {
-    let token = null
-    const auth = await client.request(`${config.apiUrl}/employee/auth`, {
+    const auth = await ownerClient.request(`${config.apiUrl}/employee/auth`, {
       method: 'POST',
       json: {
         username: config.owner.username,
@@ -170,69 +178,107 @@ async function main() {
         valid_time: config.owner.validTime,
       },
     })
+    const authCookie = auth.cookieMetadata
+    const authBodyIsSafe =
+      auth.body && typeof auth.body === 'object' && !Array.isArray(auth.body) &&
+      !Object.prototype.hasOwnProperty.call(auth.body, 'token') &&
+      !Object.prototype.hasOwnProperty.call(auth.body, 'employee_id')
     const authIsValid =
       auth.status === 200 &&
       auth.body?.allowed === true &&
-      typeof auth.body?.token === 'string' && auth.body.token.length > 0 &&
       typeof auth.body?.expires_at === 'string' && !Number.isNaN(Date.parse(auth.body.expires_at)) &&
-      auth.body?.role === 'OWNER'
+      auth.body?.role === 'OWNER' &&
+      authBodyIsSafe &&
+      authCookie?.received === true &&
+      authCookie.name === '__Host-aurora_session' &&
+      authCookie.httpOnly === true &&
+      authCookie.secure === true &&
+      authCookie.sameSite === 'none' &&
+      authCookie.path === '/' &&
+      authCookie.deleted === false &&
+      ownerClient.hasSessionCookie()
 
     if (authIsValid) {
-      token = auth.body.token
-      reporter.pass('Owner login returned a valid session', {
+      reporter.pass('Owner login returned a valid cookie session', {
         path: '/employee/auth',
         httpStatus: auth.status,
         role: auth.body.role,
         expiresAt: auth.body.expires_at,
+        sessionFlags: authCookie,
       })
     } else {
-      reporter.fail('Owner login returned a valid session', resultDetails(auth))
+      reporter.fail('Owner login returned a valid cookie session', {
+        ...resultDetails(auth),
+        sessionFlags: authCookie,
+        hasSessionCookie: ownerClient.hasSessionCookie(),
+        bodyContainsToken: Object.prototype.hasOwnProperty.call(auth.body ?? {}, 'token'),
+        bodyContainsEmployeeId: Object.prototype.hasOwnProperty.call(auth.body ?? {}, 'employee_id'),
+      })
     }
 
-    if (token) {
-      const ownerHeaders = buildOwnerHeaders({
-        username: config.owner.username,
-        phoneNumber: config.owner.phoneNumber,
-        token,
-      })
-      const hasRoleHeader = Object.keys(ownerHeaders).some((header) => header.toLowerCase().includes('role'))
-      const createdAccounts = await client.request(`${config.apiUrl}/owner/accounts/created`, {
-        headers: ownerHeaders,
-      })
+    if (authIsValid) {
+      const createdAccounts = await ownerClient.request(`${config.apiUrl}/owner/accounts/created`)
       const sensitiveKeys = findSensitiveResponseKeys(createdAccounts.body)
 
-      if (createdAccounts.status === 200 && Array.isArray(createdAccounts.body) && !hasRoleHeader && sensitiveKeys.length === 0) {
+      if (createdAccounts.status === 200 && Array.isArray(createdAccounts.body) && sensitiveKeys.length === 0) {
         reporter.pass('Owner protected created-account list is safe and reachable', {
           path: '/owner/accounts/created',
           httpStatus: createdAccounts.status,
           accountCount: createdAccounts.body.length,
-          roleHeaderSent: false,
+          legacyAuthHeadersSent: false,
         })
       } else {
         reporter.fail('Owner protected created-account list is safe and reachable', {
           ...resultDetails(createdAccounts),
           responseIsArray: Array.isArray(createdAccounts.body),
-          roleHeaderSent: hasRoleHeader,
+          legacyAuthHeadersSent: false,
           sensitiveKeys,
         })
       }
 
-      const logout = await client.request(`${config.apiUrl}/employee/auth/logout`, {
+      const logout = await ownerClient.request(`${config.apiUrl}/employee/auth/logout`, {
         method: 'POST',
-        json: {
-          username: config.owner.username,
-          phone_number: config.owner.phoneNumber,
-          token,
-        },
       })
-      if (logout.status === 200 && logout.body?.success === true) {
-        reporter.pass('Owner logout cleared the test session', { path: '/employee/auth/logout', httpStatus: logout.status })
+      const logoutBodyIsExact =
+        logout.body && typeof logout.body === 'object' && !Array.isArray(logout.body) &&
+        logout.body.success === true && Object.keys(logout.body).length === 1
+      const deletionCookie = logout.cookieMetadata
+      const logoutIsValid =
+        logout.status === 200 &&
+        logoutBodyIsExact &&
+        deletionCookie?.received === true &&
+        deletionCookie.name === '__Host-aurora_session' &&
+        deletionCookie.deleted === true &&
+        !ownerClient.hasSessionCookie()
+
+      if (logoutIsValid) {
+        reporter.pass('Owner logout cleared the cookie session', {
+          path: '/employee/auth/logout',
+          httpStatus: logout.status,
+          sessionFlags: deletionCookie,
+          hasSessionCookie: false,
+        })
       } else {
-        reporter.fail('Owner logout cleared the test session', resultDetails(logout))
+        reporter.fail('Owner logout cleared the cookie session', {
+          ...resultDetails(logout),
+          sessionFlags: deletionCookie,
+          hasSessionCookie: ownerClient.hasSessionCookie(),
+        })
+      }
+
+      const afterLogout = await ownerClient.request(`${config.apiUrl}/owner/accounts/created`)
+      if (afterLogout.status === 401) {
+        reporter.pass('Logged-out owner session is rejected', {
+          path: '/owner/accounts/created',
+          httpStatus: afterLogout.status,
+        })
+      } else {
+        reporter.fail('Logged-out owner session is rejected', resultDetails(afterLogout))
       }
     } else {
       reporter.skip('Owner protected account list', { reason: 'Owner authentication failed.' })
-      reporter.skip('Owner logout', { reason: 'No valid owner token was returned.' })
+      reporter.skip('Owner logout', { reason: 'No valid owner session was returned.' })
+      reporter.skip('Post-logout access rejection', { reason: 'No valid owner session was returned.' })
     }
   }
 

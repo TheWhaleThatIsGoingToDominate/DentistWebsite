@@ -8,17 +8,14 @@ export type EmployeeLoginCredentials = {
 export type EmployeeRole = 'DOCTOR' | 'OWNER' | 'RECEPTIONIST' | 'MANAGER'
 
 export type EmployeeAuthenticationResponse = {
-  allowed?: boolean
-  token?: string
-  expires_at?: string
-  role?: EmployeeRole
+  allowed: true
+  expires_at: string
+  role: EmployeeRole
 }
 
 export type EmployeeSession = {
   username: string
   phone_number: string
-  token: string
-  tokenDuration: number
   expires_at: string
   role: EmployeeRole
 }
@@ -54,11 +51,23 @@ function isEmployeeSession(value: unknown): value is EmployeeSession {
   return (
     typeof session.username === 'string' &&
     typeof session.phone_number === 'string' &&
-    typeof session.token === 'string' &&
-    typeof session.tokenDuration === 'number' &&
     typeof session.expires_at === 'string' &&
     !Number.isNaN(Date.parse(session.expires_at)) &&
     isEmployeeRole(session.role)
+  )
+}
+
+function isEmployeeAuthenticationResponse(value: unknown): value is EmployeeAuthenticationResponse {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const response = value as Partial<EmployeeAuthenticationResponse>
+  return (
+    response.allowed === true &&
+    typeof response.expires_at === 'string' &&
+    !Number.isNaN(Date.parse(response.expires_at)) &&
+    isEmployeeRole(response.role)
   )
 }
 
@@ -93,6 +102,7 @@ export async function authenticateEmployeeAccess(
 ): Promise<EmployeeAuthenticationResponse | null> {
   const response = await fetch(`${EMPLOYEE_AUTH_BASE_URL}/employee/auth`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
@@ -112,7 +122,12 @@ export async function authenticateEmployeeAccess(
     throw new Error('Employee authentication request failed')
   }
 
-  return response.json() as Promise<EmployeeAuthenticationResponse>
+  const payload: unknown = await response.json()
+  if (!isEmployeeAuthenticationResponse(payload)) {
+    throw new Error('The backend returned an invalid employee authentication response')
+  }
+
+  return payload
 }
 
 export async function checkEmployeeAccessKey(credentials: EmployeeLoginCredentials) {
@@ -135,8 +150,26 @@ export function loadEmployeeSession() {
 
   try {
     const parsedSession = JSON.parse(rawSession)
-    return isEmployeeSession(parsedSession) ? parsedSession : null
+    if (!isEmployeeSession(parsedSession)) {
+      storage?.removeItem(EMPLOYEE_SESSION_STORAGE_KEY)
+      return null
+    }
+
+    const safeSession: EmployeeSession = {
+      username: parsedSession.username,
+      phone_number: parsedSession.phone_number,
+      expires_at: parsedSession.expires_at,
+      role: parsedSession.role,
+    }
+    const safeKeys = new Set(['username', 'phone_number', 'expires_at', 'role'])
+
+    if (Object.keys(parsedSession).some((key) => !safeKeys.has(key))) {
+      storage?.setItem(EMPLOYEE_SESSION_STORAGE_KEY, JSON.stringify(safeSession))
+    }
+
+    return safeSession
   } catch {
+    storage?.removeItem(EMPLOYEE_SESSION_STORAGE_KEY)
     return null
   }
 }
@@ -147,20 +180,12 @@ export function clearStoredEmployeeSession() {
 }
 
 export async function clearEmployeeSessionInBackend(
-  session: EmployeeSession,
   options: { keepalive?: boolean } = {},
 ) {
   try {
     const response = await fetch(`${EMPLOYEE_AUTH_BASE_URL}/employee/auth/logout`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username: session.username,
-        phone_number: session.phone_number,
-        token: session.token,
-      }),
+      credentials: 'include',
       keepalive: options.keepalive,
     })
 

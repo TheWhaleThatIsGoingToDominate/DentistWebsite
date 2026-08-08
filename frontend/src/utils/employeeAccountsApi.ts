@@ -1,4 +1,4 @@
-import { loadEmployeeSession } from './employeeAccess'
+import { clearStoredEmployeeSession, loadEmployeeSession } from './employeeAccess'
 
 export type EmployeeAccountRole = 'RECEPTIONIST' | 'MANAGER' | 'DOCTOR'
 export type ManagedEmployeeAccountRole = EmployeeAccountRole | 'OWNER'
@@ -276,11 +276,7 @@ async function requestOwnerAccountData(
   try {
     response = await fetch(`${EMPLOYEE_ACCOUNTS_BASE_URL}${path}`, {
       method,
-      headers: {
-        Authorization: `Bearer ${session.token}`,
-        'X-Employee-Username': session.username,
-        'X-Employee-Phone': session.phone_number,
-      },
+      credentials: 'include',
     })
   } catch {
     throw new EmployeeAccountsRequestError(
@@ -298,6 +294,7 @@ async function requestOwnerAccountData(
   }
 
   if (!response.ok) {
+    if (response.status === 401) clearStoredEmployeeSession()
     throw new EmployeeAccountsRequestError(
       getManagementErrorMessage(response.status, payload),
       { status: response.status },
@@ -318,16 +315,15 @@ export async function createEmployeeAccount(
 
   const response = await fetch(`${EMPLOYEE_ACCOUNTS_BASE_URL}/owner/createAccount`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
-      Authorization: `Bearer ${session.token}`,
-      'X-Employee-Username': session.username,
-      'X-Employee-Phone': session.phone_number,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(account),
   })
 
   if (!response.ok) {
+    if (response.status === 401) clearStoredEmployeeSession()
     let payload: unknown = null
 
     try {

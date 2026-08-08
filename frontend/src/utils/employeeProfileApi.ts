@@ -1,4 +1,5 @@
 import {
+  clearStoredEmployeeSession,
   isEmployeeRole,
   loadEmployeeSession,
   type EmployeeRole,
@@ -173,11 +174,7 @@ export async function loadCurrentEmployeeProfile(): Promise<EmployeeProfileRespo
   try {
     response = await fetch(`${EMPLOYEE_PROFILE_BASE_URL}/employee/admin/employee/profile`, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${session.token}`,
-        'X-Employee-Username': session.username,
-        'X-Employee-Phone': session.phone_number,
-      },
+      credentials: 'include',
     })
   } catch {
     throw new EmployeeProfileRequestError(
@@ -196,6 +193,7 @@ export async function loadCurrentEmployeeProfile(): Promise<EmployeeProfileRespo
   }
 
   if (!response.ok) {
+    if (response.status === 401) clearStoredEmployeeSession()
     throw new EmployeeProfileRequestError(getErrorMessage(response.status, payload), {
       status: response.status,
     })

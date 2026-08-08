@@ -4,7 +4,7 @@ def Authentication(access_key):
 #   ^^^^^^^^^^^^^^^^^^^^^^^^ new logic
 from database.main import supabase
 from fastapi import HTTPException
-from datetime import datetime, date
+from datetime import datetime
 import os
 from cryptography.fernet import Fernet
 
@@ -193,7 +193,7 @@ def create_setup_token(valid_time: int):
 
     return token, token_expiry_time.isoformat(), token_creation_time.isoformat(), hashed_token, token_salt
 
-def create_token(username: str, phone_number: str, valid_time: int): #helper function for auth
+def create_token(employee_id: str, valid_time: int): #helper function for auth
     """
     create a token for each visitor on the admin page.
     delete it once they exit from the page or refresh it.
@@ -219,7 +219,7 @@ def create_token(username: str, phone_number: str, valid_time: int): #helper fun
             "token_creation_time":token_creation_time.isoformat(), 
             "token_expiry_time":token_expiry_time.isoformat()
             })
-        .eq("employee_lookup", employee_lookup(username, phone_number))
+        .eq("employee_id", employee_id)
         .execute()
     )
 
@@ -241,8 +241,8 @@ def token_hash_verifier(hashed_token: str, token_salt: str, theToken: str):
     return compare_digest(hashed_token, calculated_hash)
 
 
-def verify_employee_token(username: str, phone_number: str, token: str): #finding the token for the website
-    def clear_employee_token_fields(username: str, phone_number: str):
+def verify_employee_token(employee_id: str, token: str): #finding the token for the website
+    def clear_employee_token_fields(employee_id: str):
         (
             supabase.table("employees").update({
                 "hashed_token": None,
@@ -251,14 +251,14 @@ def verify_employee_token(username: str, phone_number: str, token: str): #findin
                 "token_creation_time": None,
                 "token_expiry_time": None,
             })
-            .eq("employee_lookup", employee_lookup(username, phone_number))
+            .eq("employee_id", employee_id)
             .execute()
         )
     
     TheEmployee = (
         supabase.table("employees")
         .select("*")
-        .eq("employee_lookup", employee_lookup(username, phone_number))
+        .eq("employee_id", employee_id)
         .eq("is_active", True)
         .execute()
         .data
@@ -274,7 +274,7 @@ def verify_employee_token(username: str, phone_number: str, token: str): #findin
     token_salt = employee.get("token_salt")
 
     if not hashed_token  or not token_salt:
-        clear_employee_token_fields(username, phone_number)
+        clear_employee_token_fields(employee_id)
         raise HTTPException(
             status_code=401,
             detail="access denied"
@@ -282,7 +282,7 @@ def verify_employee_token(username: str, phone_number: str, token: str): #findin
     
     raw_time: str = employee.get("token_expiry_time")
     if not raw_time:
-        clear_employee_token_fields(username, phone_number)
+        clear_employee_token_fields(employee_id)
         raise HTTPException(status_code=401, detail="Token expired, access denied")
 
     try:
@@ -301,20 +301,20 @@ def verify_employee_token(username: str, phone_number: str, token: str): #findin
             if token_expiry_time.tzinfo is None:
                 token_expiry_time = token_expiry_time.replace(tzinfo=timezone.utc)
         else:
-            clear_employee_token_fields(username, phone_number)
+            clear_employee_token_fields(employee_id)
             raise HTTPException(
                 status_code= 401, 
                 detail="access denied"
             )
     except Exception:
-        clear_employee_token_fields(username, phone_number)
+        clear_employee_token_fields(employee_id)
         raise HTTPException(
             status_code= 401, 
             detail="access denied"
         )
 
     if token_expiry_time <= datetime.now(timezone.utc):
-        clear_employee_token_fields(username, phone_number)
+        clear_employee_token_fields(employee_id)
         raise HTTPException(
             status_code=401,
             detail="Token expired, access denied"
@@ -331,12 +331,12 @@ def verify_employee_token(username: str, phone_number: str, token: str): #findin
     
     return TheEmployee
 
-def delete_employee_token(username: str, phone_number: str, token: str):
+def delete_employee_token(employee_id: str, token):
     #comparing hashed tokens
     theToken = (
         supabase.table("employees")
         .select("hashed_token, token_salt")
-        .eq("employee_lookup", employee_lookup(username, phone_number))
+        .eq("employee_id", employee_id)
         .execute()
         .data
     )
@@ -367,7 +367,7 @@ def delete_employee_token(username: str, phone_number: str, token: str):
             "token_creation_time":None, 
             "token_expiry_time":None
             })
-        .eq("employee_lookup", employee_lookup(username, phone_number))
+        .eq("employee_id", employee_id)
         .execute()
     )
 
@@ -487,7 +487,8 @@ def auth(username, phone_number, password, valid_time: int):
                 raise HTTPException(status_code=500, detail="Employee role is missing")
             if not theRole[0].get("employee_id") or not theRole[0].get("role"):
                 raise HTTPException(status_code=500, detail="Employee role is missing")
-            role = decrypt_employee_role(theRole[0]["employee_id"],theRole[0]["role"]).upper()
+            employee_id = theRole[0]["employee_id"]
+            role = decrypt_employee_role(employee_id ,theRole[0]["role"]).upper()
 
             #valid time authentication
             if valid_time not in {1, 30, 60, 120, 180}:
@@ -497,9 +498,15 @@ def auth(username, phone_number, password, valid_time: int):
                 )
 
             #token creation with expiry time
-            token, token_expiry_time= create_token(username, phone_number, valid_time)
+            token, token_expiry_time = create_token(employee_id, valid_time)
 
-            return {"allowed":True, "token":token, "expires_at":token_expiry_time, "role":role}
+            return {
+                "allowed": True,
+                "employee_id": employee_id,
+                "token": token,
+                "expires_at": token_expiry_time,
+                "role": role,
+            }
         else:
             raise HTTPException(
                 status_code=401,

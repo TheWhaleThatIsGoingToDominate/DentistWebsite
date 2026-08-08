@@ -362,7 +362,6 @@ export default function EmployeeAccountActivationPage() {
 
         if (
           authentication?.allowed !== true ||
-          !authentication.token ||
           !authentication.expires_at ||
           Number.isNaN(Date.parse(authentication.expires_at)) ||
           !isEmployeeRole(authentication.role)
@@ -373,8 +372,6 @@ export default function EmployeeAccountActivationPage() {
         saveEmployeeSession({
           username: loginUsername,
           phone_number: loginPhoneNumber,
-          token: authentication.token,
-          tokenDuration,
           expires_at: authentication.expires_at,
           role: authentication.role,
         })
