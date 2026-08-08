@@ -1,4 +1,4 @@
-import { buildOwnerHeaders, createApiClient } from './apiClient.js'
+import { createApiClient } from './apiClient.js'
 import { DeploymentConfigError, loadDeploymentConfig } from './config.js'
 import {
   assertAccountActivationStatus,
@@ -158,28 +158,40 @@ async function authenticateOwner(context, validTime) {
       },
     },
     status: 200,
-    allowedSensitiveKeys: ['token'],
     validate: (body) => {
       const errors = []
+      const cookie = client.getLastCookieMetadata()
       check(body?.allowed === true, 'allowed must be true.', errors)
-      check(typeof body?.token === 'string' && body.token.length > 0, 'token is required.', errors)
-      check(typeof body?.expires_at === 'string', 'expires_at is required.', errors)
+      check(
+        typeof body?.expires_at === 'string' && !Number.isNaN(Date.parse(body.expires_at)),
+        'expires_at must be valid.',
+        errors,
+      )
       check(body?.role === 'OWNER', 'role must be OWNER.', errors)
+      check(!isRecord(body) || !('token' in body), 'Login JSON must not contain token.', errors)
+      check(!isRecord(body) || !('employee_id' in body), 'Login JSON must not contain employee_id.', errors)
+      check(client.hasSessionCookie(), 'Owner session cookie was not captured.', errors)
+      check(cookie?.received === true, 'Session cookie metadata must show receipt.', errors)
+      check(cookie?.name === '__Host-aurora_session', 'Unexpected session cookie name.', errors)
+      check(cookie?.httpOnly === true, 'Session cookie must be HttpOnly.', errors)
+      check(cookie?.secure === true, 'Session cookie must be Secure.', errors)
+      check(cookie?.sameSite === 'none', 'Session cookie must use SameSite=None.', errors)
+      check(cookie?.path === '/', 'Session cookie must use Path=/.', errors)
+      check(cookie?.deleted === false, 'Login cookie must not be a deletion cookie.', errors)
       return errors
     },
   })
 }
 
 async function createPending(context, fixture) {
-  const { client, reporter, config, ownerHeaders } = context
+  const { ownerClient, reporter, config } = context
   const body = await expectApi({
-    client,
+    client: ownerClient,
     reporter,
     name: `${fixture.label}: pending account created`,
     url: `${config.apiUrl}/owner/createAccount`,
     options: {
       method: 'POST',
-      headers: ownerHeaders,
       json: {
         name: fixture.pendingUsername,
         phone_number: fixture.phoneNumber,
@@ -203,10 +215,10 @@ async function createPending(context, fixture) {
 }
 
 async function verifyCode(context, fixture, code, flow) {
-  const { client, reporter, config } = context
+  const { publicClient, reporter, config } = context
   const username = flow === 'ACTIVATION' ? fixture.pendingUsername : fixture.activeUsername
   const body = await expectApi({
-    client,
+    client: publicClient,
     reporter,
     name: `${fixture.label}: ${flow.toLowerCase()} code verified`,
     url: `${config.apiUrl}/employee/account/activate`,
@@ -230,9 +242,9 @@ async function verifyCode(context, fixture, code, flow) {
 }
 
 async function completeActivation(context, fixture, setupToken) {
-  const { client, reporter, config } = context
+  const { publicClient, reporter, config } = context
   await expectApi({
-    client,
+    client: publicClient,
     reporter,
     name: `${fixture.label}: employee activated for expiry fixture`,
     url: `${config.apiUrl}/employee/account/credentials`,
@@ -254,13 +266,13 @@ async function createActive(context, fixture) {
 }
 
 async function deactivate(context, fixture) {
-  const { client, reporter, config, ownerHeaders } = context
+  const { ownerClient, reporter, config } = context
   await expectApi({
-    client,
+    client: ownerClient,
     reporter,
     name: `${fixture.label}: employee deactivated`,
     url: `${config.apiUrl}/owner/account/deactivate?employee_id=${encodeURIComponent(fixture.employeeId)}`,
-    options: { method: 'POST', headers: ownerHeaders },
+    options: { method: 'POST' },
     status: 200,
     validate: (body) => {
       const errors = []
@@ -272,13 +284,13 @@ async function deactivate(context, fixture) {
 }
 
 async function startReactivation(context, fixture) {
-  const { client, reporter, config, ownerHeaders } = context
+  const { ownerClient, reporter, config } = context
   const body = await expectApi({
-    client,
+    client: ownerClient,
     reporter,
     name: `${fixture.label}: reactivation started`,
     url: `${config.apiUrl}/owner/account/reactivation/start?employee_id=${encodeURIComponent(fixture.employeeId)}`,
-    options: { method: 'POST', headers: ownerHeaders },
+    options: { method: 'POST' },
     status: 200,
     allowedSensitiveKeys: ['reactivation_code'],
     validate: (body) => {
@@ -296,7 +308,7 @@ async function startReactivation(context, fixture) {
 
 async function assertExpiredRejection(context, { name, url, options, validate }) {
   return expectApi({
-    client: context.client,
+    client: context.publicClient,
     reporter: context.reporter,
     name,
     url,
@@ -337,7 +349,12 @@ async function main() {
     return
   }
 
-  const client = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose })
+  const publicClient = createApiClient({ timeoutMs: config.timeoutMs, verbose: config.flags.verbose })
+  const ownerClient = createApiClient({
+    timeoutMs: config.timeoutMs,
+    verbose: config.flags.verbose,
+    cookieSession: true,
+  })
   const databaseClient = createSupabaseReadClient({
     enabled: true,
     supabaseUrl: config.supabase.url,
@@ -355,13 +372,8 @@ async function main() {
   try {
     reporter.pass('All four expiry safety flags are present')
     reporter.section('Fixture preparation')
-    const ownerAuth = await authenticateOwner({ client, reporter, config }, config.owner.validTime)
-    const ownerHeaders = buildOwnerHeaders({
-      username: config.owner.username,
-      phoneNumber: config.owner.phoneNumber,
-      token: ownerAuth.token,
-    })
-    const context = { client, reporter, config, databaseClient, ownerHeaders }
+    await authenticateOwner({ client: ownerClient, reporter, config }, config.owner.validTime)
+    const context = { publicClient, ownerClient, reporter, config, databaseClient }
 
     const fixtureA = fixtures.activationCode
     const activationA = await createPending(context, fixtureA)
@@ -533,17 +545,22 @@ async function main() {
     }
 
     reporter.section('Authentication-token expiry')
-    const expiringOwnerAuth = await authenticateOwner(context, 1)
-    const expiringOwnerHeaders = buildOwnerHeaders({
-      username: config.owner.username,
-      phoneNumber: config.owner.phoneNumber,
-      token: expiringOwnerAuth.token,
+    const expiringOwnerClient = createApiClient({
+      timeoutMs: config.timeoutMs,
+      verbose: config.flags.verbose,
+      cookieSession: true,
     })
+    const expiringOwnerAuth = await authenticateOwner(
+      { client: expiringOwnerClient, reporter, config },
+      1,
+    )
     await waitUntilExpiry(reporter, 'Owner authentication token', expiringOwnerAuth.expires_at)
-    await assertExpiredRejection(context, {
+    await expectApi({
+      client: expiringOwnerClient,
+      reporter,
       name: 'Expired owner authentication token is rejected',
       url: `${config.apiUrl}/owner/accounts/created`,
-      options: { headers: expiringOwnerHeaders },
+      status: 401,
       validate: (body) => Array.isArray(body) ? ['Expired token returned account data.'] : [],
     })
   } catch (error) {
