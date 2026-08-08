@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import importlib, pkgutil
 from api import routers as routers_package
-from trustedOrigins import TRUSTED_ORIGINS
+from api.trustedOrigins import TRUSTED_ORIGINS
 app = FastAPI()
 
 @app.exception_handler(RequestValidationError)
