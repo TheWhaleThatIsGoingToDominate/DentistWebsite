@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import importlib, pkgutil
 from api import routers as routers_package
-
+from trustedOrigins import TRUSTED_ORIGINS
 app = FastAPI()
 
 @app.exception_handler(RequestValidationError)
@@ -33,11 +33,7 @@ for _ ,module_name, _ in pkgutil.iter_modules(routers_package.__path__):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://dentist-website-lac-two.vercel.app",
-        "http://127.0.0.1:5174",
-        "http://localhost:5174",
-    ],
+    allow_origins=TRUSTED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
